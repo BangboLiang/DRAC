@@ -1,0 +1,60 @@
+{
+  "name": "drac_eval_smoke",
+  "seed": 7,
+  "output_dir": "results/drac_eval_smoke",
+  "algorithms": [
+    "static_sym",
+    "sym_ocs",
+    "drac",
+    "ideal_asym",
+    "drac_sym"
+  ],
+  "network": {
+    "base_bw_gbps": 20.0,
+    "ocs_unit_bw_gbps": 20.0,
+    "per_node_port_budget": 2,
+    "total_ocs_links": 8,
+    "reconfig_delay_ms": 0.2
+  },
+  "workloads": [
+    {
+      "name": "tp",
+      "kind": "tp",
+      "segment_count": 2,
+      "scale": 1.0,
+      "tp_group_size": 4
+    },
+    {
+      "name": "dp",
+      "kind": "dp",
+      "segment_count": 2,
+      "scale": 1.4,
+      "dp_group_size": 4
+    },
+    {
+      "name": "mixed",
+      "kind": "mixed",
+      "segment_count": 2,
+      "scale": 1.2,
+      "mixed_weights": {
+        "tp": 0.45,
+        "dp": 0.55
+      }
+    },
+    {
+      "name": "pp",
+      "kind": "pp",
+      "segment_count": 2,
+      "scale": 0.8
+    }
+  ],
+  "sweeps": {
+    "cluster_sizes": [8],
+    "asymmetry_levels": [1.0, 4.0],
+    "port_budgets": [2],
+    "total_ocs_links": [8],
+    "reconfig_delays_ms": [0.2]
+  },
+  "generate_figures": true,
+  "figure_formats": ["png"]
+}

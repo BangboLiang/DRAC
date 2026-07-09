@@ -1,0 +1,60 @@
+{
+  "name": "drac_eval_paper",
+  "seed": 7,
+  "output_dir": "results/drac_eval_paper",
+  "algorithms": [
+    "static_sym",
+    "sym_ocs",
+    "drac",
+    "ideal_asym",
+    "drac_sym"
+  ],
+  "network": {
+    "base_bw_gbps": 25.0,
+    "ocs_unit_bw_gbps": 25.0,
+    "per_node_port_budget": 4,
+    "total_ocs_links": 24,
+    "reconfig_delay_ms": 0.5
+  },
+  "workloads": [
+    {
+      "name": "tp",
+      "kind": "tp",
+      "segment_count": 4,
+      "scale": 1.0,
+      "tp_group_size": 8
+    },
+    {
+      "name": "dp",
+      "kind": "dp",
+      "segment_count": 4,
+      "scale": 1.8,
+      "dp_group_size": 8
+    },
+    {
+      "name": "mixed",
+      "kind": "mixed",
+      "segment_count": 4,
+      "scale": 1.4,
+      "mixed_weights": {
+        "tp": 0.4,
+        "dp": 0.6
+      }
+    },
+    {
+      "name": "pp",
+      "kind": "pp",
+      "segment_count": 4,
+      "scale": 0.9
+    }
+  ],
+  "sweeps": {
+    "cluster_sizes": [8, 16, 32],
+    "asymmetry_levels": [1.0, 2.0, 4.0, 8.0],
+    "port_budgets": [2, 4, 8],
+    "total_ocs_links": [16, 32, 64],
+    "reconfig_delays_ms": [0.2, 0.5]
+  },
+  "generate_figures": true,
+  "figure_formats": ["png"]
+}
