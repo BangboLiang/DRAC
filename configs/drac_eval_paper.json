@@ -11,10 +11,10 @@
   ],
   "network": {
     "base_bw_gbps": 25.0,
-    "ocs_unit_bw_gbps": 25.0,
+    "ocs_unit_bw_gbps": 100.0,
     "per_node_port_budget": 4,
-    "total_ocs_links": 24,
-    "reconfig_delay_ms": 0.5
+    "total_ocs_links": 32,
+    "reconfig_delay_ms": 20
   },
   "workloads": [
     {

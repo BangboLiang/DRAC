@@ -41,6 +41,18 @@ class WorkloadConfig:
     load_path: str | None = None
     tp_group_size: int = 8
     dp_group_size: int = 8
+    pp_stage_count: int = 4
+    microbatches: int = 4
+    model_layers: int = 126
+    model_hidden: int = 16384
+    model_seq: int = 8192
+    model_head_dim: int = 128
+    model_kv_dim: int = 1024
+    model_ffn_hidden: int = 53248
+    model_total_params: float = 405e9
+    bytes_per_act: int = 2
+    bytes_per_param: int = 2
+    bytes_per_grad: int = 4
     mixed_weights: Dict[str, float] = field(
         default_factory=lambda: {"tp": 0.5, "dp": 0.5}
     )

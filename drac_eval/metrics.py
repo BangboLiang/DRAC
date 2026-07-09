@@ -26,10 +26,20 @@ class SegmentMetrics:
     skew_p95: float
 
 
-def _completion_time_ms(demand: np.ndarray, capacity: np.ndarray) -> float:
+def _gbps_to_bytes_per_ms(bandwidth_gbps: np.ndarray | float) -> np.ndarray | float:
+    # Interpret config bandwidth in Gbps; convert to bytes/ms.
+    return np.asarray(bandwidth_gbps, dtype=float) * (1e9 / 8.0 / 1000.0)
+
+
+def _bytes_per_ms_to_gbps(rate_bytes_per_ms: np.ndarray | float) -> np.ndarray | float:
+    return np.asarray(rate_bytes_per_ms, dtype=float) * (8.0 * 1000.0 / 1e9)
+
+
+def _completion_time_ms(demand: np.ndarray, capacity_gbps: np.ndarray) -> float:
     ratios = np.zeros_like(demand, dtype=float)
     mask = demand > 0
-    ratios[mask] = demand[mask] / np.maximum(capacity[mask], EPS)
+    capacity_bytes_per_ms = _gbps_to_bytes_per_ms(capacity_gbps)
+    ratios[mask] = demand[mask] / np.maximum(capacity_bytes_per_ms[mask], EPS)
     if not np.any(mask):
         return 0.0
     return float(np.max(ratios))
@@ -43,25 +53,34 @@ def _matching_errors(target: np.ndarray, realized: np.ndarray) -> tuple[float, f
     return float(np.sum(values)), float(np.percentile(values, 95))
 
 
-def _network_utilization(demand: np.ndarray, capacity: np.ndarray, completion: float) -> float:
+def _network_utilization(
+    demand: np.ndarray, capacity_gbps: np.ndarray, completion: float
+) -> float:
     if completion <= 0.0:
         return 0.0
-    capacity_total = float(np.sum(capacity))
+    capacity_total = float(np.sum(_gbps_to_bytes_per_ms(capacity_gbps)))
     if capacity_total <= 0.0:
         return 0.0
     return float(np.sum(demand) / (completion * capacity_total))
 
 
-def _wasted_idle_capacity(demand: np.ndarray, capacity: np.ndarray, completion: float) -> float:
+def _wasted_idle_capacity(
+    demand: np.ndarray, capacity_gbps: np.ndarray, completion: float
+) -> float:
     if completion <= 0.0:
         return 0.0
+    capacity_bytes_per_ms = _gbps_to_bytes_per_ms(capacity_gbps)
     required = demand / max(completion, EPS)
-    waste = np.maximum(0.0, capacity - required)
+    waste = np.maximum(0.0, capacity_bytes_per_ms - required)
     np.fill_diagonal(waste, 0.0)
-    return float(np.sum(waste))
+    return float(np.sum(_bytes_per_ms_to_gbps(waste)))
 
 
-def _symmetric_waste(demand: np.ndarray, realized_overlay: np.ndarray, unit_bw: float) -> float:
+def _symmetric_waste(
+    demand: np.ndarray, realized_overlay_gbps: np.ndarray, completion_ms: float
+) -> float:
+    if completion_ms <= 0.0:
+        return 0.0
     waste = 0.0
     n = demand.shape[0]
     for i in range(n):
@@ -70,15 +89,21 @@ def _symmetric_waste(demand: np.ndarray, realized_overlay: np.ndarray, unit_bw: 
             b = float(demand[j, i])
             if a <= EPS and b <= EPS:
                 continue
-            if abs(realized_overlay[i, j] - realized_overlay[j, i]) > EPS:
+            if abs(realized_overlay_gbps[i, j] - realized_overlay_gbps[j, i]) > EPS:
                 low_dir = (i, j) if a < b else (j, i)
                 low_demand = min(a, b)
-                low_cap = float(realized_overlay[low_dir[0], low_dir[1]])
-                high_cap = float(realized_overlay[low_dir[1], low_dir[0]])
-                waste += max(0.0, min(low_cap, high_cap) - low_demand / max(unit_bw, 1.0))
+                low_cap = float(realized_overlay_gbps[low_dir[0], low_dir[1]])
+                high_cap = float(realized_overlay_gbps[low_dir[1], low_dir[0]])
+                required_gbps = float(
+                    _bytes_per_ms_to_gbps(low_demand / max(completion_ms, EPS))
+                )
+                waste += max(0.0, min(low_cap, high_cap) - required_gbps)
             else:
                 low_demand = min(a, b)
-                waste += max(0.0, float(realized_overlay[i, j]) - low_demand)
+                required_gbps = float(
+                    _bytes_per_ms_to_gbps(low_demand / max(completion_ms, EPS))
+                )
+                waste += max(0.0, float(realized_overlay_gbps[i, j]) - required_gbps)
     return float(waste)
 
 
@@ -123,7 +148,7 @@ def compute_segment_metrics(
             demand, allocation.total_bandwidth, completion
         ),
         symmetric_waste_gbps=_symmetric_waste(
-            demand, allocation.realized_overlay, float(net.ocs_unit_bw_gbps)
+            demand, allocation.realized_overlay, completion
         ),
         active_directional_ports=active_ports,
         releasable_directional_ports=max(0, total_reserved_dir - active_ports),

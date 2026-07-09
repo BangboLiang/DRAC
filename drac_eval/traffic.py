@@ -3,12 +3,15 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
+from math import ceil
 from pathlib import Path
 from typing import Dict, Iterable, List
 
 import numpy as np
 
 from .config import WorkloadConfig
+from llama3_comm.config import ModelConfig, ParallelConfig
+from llama3_comm.traffic import llama3_megatron_payloads
 
 
 @dataclass
@@ -40,16 +43,66 @@ def _ensure_group_size(group_size: int, n: int) -> int:
     return max(2, min(int(group_size), int(n)))
 
 
+def _build_model_and_parallel(
+    workload: WorkloadConfig, cluster_size: int
+) -> tuple[ModelConfig, ParallelConfig]:
+    tp = max(2, int(workload.tp_group_size))
+    dp = max(2, int(workload.dp_group_size))
+    pp = max(1, min(int(workload.pp_stage_count), int(cluster_size)))
+    microbatches = max(1, int(workload.microbatches))
+    mod = ModelConfig(
+        layers=int(workload.model_layers),
+        hidden=int(workload.model_hidden),
+        seq=int(workload.model_seq),
+        head_dim=int(workload.model_head_dim),
+        kv_dim=int(workload.model_kv_dim),
+        ffn_hidden=int(workload.model_ffn_hidden),
+        total_params=float(workload.model_total_params),
+        bytes_per_act=int(workload.bytes_per_act),
+        bytes_per_param=int(workload.bytes_per_param),
+        bytes_per_grad=int(workload.bytes_per_grad),
+    )
+    par = ParallelConfig(
+        tp=tp,
+        pp=pp,
+        dp=dp,
+        global_batch_seqs=tp * pp * microbatches,
+        microbatch_seqs=1,
+    )
+    return mod, par
+
+
+def _layers_per_segment(workload: WorkloadConfig) -> int:
+    return max(1, int(ceil(int(workload.model_layers) / max(1, int(workload.segment_count)))))
+
+
 def _tp_matrix(
-    n: int, asymmetry: float, scale: float, rng: np.random.Generator, group_size: int
+    n: int,
+    asymmetry: float,
+    scale: float,
+    rng: np.random.Generator,
+    group_size: int,
+    workload: WorkloadConfig,
 ) -> np.ndarray:
     mat = np.zeros((n, n), dtype=float)
     group = _ensure_group_size(group_size, n)
+    mod, par = _build_model_and_parallel(workload, n)
+    a_full, _a_shard, _p_bf16, _p_fp32, _ = llama3_megatron_payloads(mod, par)
+    layers_per_segment = _layers_per_segment(workload)
+    segment_microbatches = max(1, int(workload.microbatches))
+    ring_bytes_per_op = float(a_full) * float(group - 1) / float(group)
+    base_bytes = (
+        4.0
+        * ring_bytes_per_op
+        * float(layers_per_segment)
+        * float(segment_microbatches)
+        * float(scale)
+    )
     for start in range(0, n, group):
         members = list(range(start, min(start + group, n)))
         for idx, src in enumerate(members):
             dst = members[(idx + 1) % len(members)]
-            fwd, rev = _dominant_pair_value(rng, 1.0 * scale, asymmetry, 0.15)
+            fwd, rev = _dominant_pair_value(rng, base_bytes, asymmetry, 0.15)
             if rng.random() < 0.5:
                 mat[src, dst] += fwd
                 mat[dst, src] += rev
@@ -60,14 +113,27 @@ def _tp_matrix(
 
 
 def _dp_matrix(
-    n: int, asymmetry: float, scale: float, rng: np.random.Generator, group_size: int
+    n: int,
+    asymmetry: float,
+    scale: float,
+    rng: np.random.Generator,
+    group_size: int,
+    workload: WorkloadConfig,
 ) -> np.ndarray:
     mat = np.zeros((n, n), dtype=float)
     group = _ensure_group_size(group_size, n)
+    mod, par = _build_model_and_parallel(workload, n)
+    _a_full, _a_shard, p_layer_tp_bf16, p_layer_tp_fp32, _ = llama3_megatron_payloads(
+        mod, par
+    )
+    layers_per_segment = _layers_per_segment(workload)
     offset = max(1, group // 2)
+    ring_rs = float(p_layer_tp_fp32) * float(group - 1) / float(group)
+    ring_ag = float(p_layer_tp_bf16) * float(group - 1) / float(group)
+    base_bytes = (ring_rs + ring_ag) * float(layers_per_segment) * float(scale)
     for src in range(n):
         dst = (src + offset) % n
-        fwd, rev = _dominant_pair_value(rng, 2.5 * scale, asymmetry * 1.5, 0.2)
+        fwd, rev = _dominant_pair_value(rng, base_bytes, asymmetry * 1.5, 0.2)
         mat[src, dst] += fwd
         mat[dst, src] += rev
         for extra in range(1, min(3, n - 1)):
@@ -80,13 +146,21 @@ def _dp_matrix(
 
 
 def _pp_matrix(
-    n: int, scale: float, segment_idx: int, segments: int, rng: np.random.Generator
+    n: int,
+    scale: float,
+    segment_idx: int,
+    segments: int,
+    rng: np.random.Generator,
+    workload: WorkloadConfig,
 ) -> np.ndarray:
     mat = np.zeros((n, n), dtype=float)
     phase = 1 if segment_idx < max(1, segments // 2) else -1
+    mod, par = _build_model_and_parallel(workload, n)
+    _a_full, a_shard, _p_bf16, _p_fp32, _ = llama3_megatron_payloads(mod, par)
+    pp_transfer_bytes = float(a_shard) * float(max(1, int(workload.microbatches))) * float(scale)
     for src in range(n - 1):
         dst = src + 1
-        major = (0.9 + 0.1 * rng.random()) * scale
+        major = (0.9 + 0.1 * rng.random()) * pp_transfer_bytes
         minor = major * 0.92
         if phase > 0:
             mat[src, dst] += major
@@ -107,14 +181,15 @@ def _mixed_matrix(
     weights: Dict[str, float],
     tp_group_size: int,
     dp_group_size: int,
+    workload: WorkloadConfig,
 ) -> np.ndarray:
     tp_w = float(weights.get("tp", 0.5))
     dp_w = float(weights.get("dp", 0.5))
     pp_w = float(weights.get("pp", 0.0))
     mat = (
-        tp_w * _tp_matrix(n, asymmetry, scale, rng, tp_group_size)
-        + dp_w * _dp_matrix(n, asymmetry, scale, rng, dp_group_size)
-        + pp_w * _pp_matrix(n, scale, segment_idx, segments, rng)
+        tp_w * _tp_matrix(n, asymmetry, scale, rng, tp_group_size, workload)
+        + dp_w * _dp_matrix(n, asymmetry, scale, rng, dp_group_size, workload)
+        + pp_w * _pp_matrix(n, scale, segment_idx, segments, rng, workload)
     )
     return mat
 
@@ -171,6 +246,7 @@ def load_or_generate_workload(
                 workload.scale,
                 rng,
                 workload.tp_group_size,
+                workload,
             )
         elif workload.kind == "dp":
             mat = _dp_matrix(
@@ -179,10 +255,11 @@ def load_or_generate_workload(
                 workload.scale,
                 rng,
                 workload.dp_group_size,
+                workload,
             )
         elif workload.kind == "pp":
             mat = _pp_matrix(
-                cluster_size, workload.scale, segment_idx, segments, rng
+                cluster_size, workload.scale, segment_idx, segments, rng, workload
             )
         elif workload.kind == "mixed":
             mat = _mixed_matrix(
@@ -195,6 +272,7 @@ def load_or_generate_workload(
                 workload.mixed_weights,
                 workload.tp_group_size,
                 workload.dp_group_size,
+                workload,
             )
         else:
             raise ValueError(f"unknown workload kind: {workload.kind}")
@@ -205,7 +283,13 @@ def load_or_generate_workload(
                 workload=workload.name,
                 segment_idx=segment_idx,
                 matrix=mat,
-                metadata={"kind": workload.kind, "asymmetry": effective_asymmetry},
+                metadata={
+                    "kind": workload.kind,
+                    "asymmetry": effective_asymmetry,
+                    "units": "bytes",
+                    "model_layers": int(workload.model_layers),
+                    "microbatches": int(workload.microbatches),
+                },
             )
         )
     return out
