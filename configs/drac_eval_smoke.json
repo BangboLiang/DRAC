@@ -56,5 +56,8 @@
     "reconfig_delays_ms": [0.2]
   },
   "generate_figures": true,
-  "figure_formats": ["png"]
+  "save_matrices": true,
+  "high_demand_tau": 1.5,
+  "high_demand_eta_fraction": 0.05,
+  "figure_formats": ["png", "pdf"]
 }

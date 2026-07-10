@@ -39,6 +39,20 @@ def _dominant_pair_value(
     return dominant, reverse
 
 
+def _component_asymmetry(
+    kind: str, asymmetry_level: float, rng: np.random.Generator
+) -> float:
+    level = max(1.0, float(asymmetry_level))
+    if kind == "tp":
+        return 1.0 + 0.30 * (level - 1.0) * (1.0 + 0.08 * rng.random()) + 0.004 * rng.random()
+    if kind == "dp":
+        return 1.0 + 0.60 * (level - 1.0) * (1.0 + 0.12 * rng.random()) + 0.006 * rng.random()
+    if kind == "pp":
+        # PP stays close to balanced over longer windows and only weakly reacts to the sweep.
+        return 1.0 + 0.04 * (level - 1.0) * (1.0 + 0.05 * rng.random()) + 0.002 * rng.random()
+    return level
+
+
 def _ensure_group_size(group_size: int, n: int) -> int:
     return max(2, min(int(group_size), int(n)))
 
@@ -102,7 +116,9 @@ def _tp_matrix(
         members = list(range(start, min(start + group, n)))
         for idx, src in enumerate(members):
             dst = members[(idx + 1) % len(members)]
-            fwd, rev = _dominant_pair_value(rng, base_bytes, asymmetry, 0.15)
+            fwd, rev = _dominant_pair_value(
+                rng, base_bytes, _component_asymmetry("tp", asymmetry, rng), 0.15
+            )
             if rng.random() < 0.5:
                 mat[src, dst] += fwd
                 mat[dst, src] += rev
@@ -133,7 +149,9 @@ def _dp_matrix(
     base_bytes = (ring_rs + ring_ag) * float(layers_per_segment) * float(scale)
     for src in range(n):
         dst = (src + offset) % n
-        fwd, rev = _dominant_pair_value(rng, base_bytes, asymmetry * 1.5, 0.2)
+        fwd, rev = _dominant_pair_value(
+            rng, base_bytes, _component_asymmetry("dp", asymmetry, rng), 0.2
+        )
         mat[src, dst] += fwd
         mat[dst, src] += rev
         for extra in range(1, min(3, n - 1)):
@@ -148,6 +166,7 @@ def _dp_matrix(
 def _pp_matrix(
     n: int,
     scale: float,
+    asymmetry: float,
     segment_idx: int,
     segments: int,
     rng: np.random.Generator,
@@ -160,8 +179,10 @@ def _pp_matrix(
     pp_transfer_bytes = float(a_shard) * float(max(1, int(workload.microbatches))) * float(scale)
     for src in range(n - 1):
         dst = src + 1
-        major = (0.9 + 0.1 * rng.random()) * pp_transfer_bytes
-        minor = major * 0.92
+        phase_bias = 1.0 + (0.015 if phase > 0 else -0.015)
+        major = (0.94 + 0.08 * rng.random()) * pp_transfer_bytes * phase_bias
+        skew = _component_asymmetry("pp", asymmetry, rng)
+        minor = major / skew
         if phase > 0:
             mat[src, dst] += major
             mat[dst, src] += minor
@@ -189,7 +210,7 @@ def _mixed_matrix(
     mat = (
         tp_w * _tp_matrix(n, asymmetry, scale, rng, tp_group_size, workload)
         + dp_w * _dp_matrix(n, asymmetry, scale, rng, dp_group_size, workload)
-        + pp_w * _pp_matrix(n, scale, segment_idx, segments, rng, workload)
+        + pp_w * _pp_matrix(n, scale, asymmetry, segment_idx, segments, rng, workload)
     )
     return mat
 
@@ -259,7 +280,13 @@ def load_or_generate_workload(
             )
         elif workload.kind == "pp":
             mat = _pp_matrix(
-                cluster_size, workload.scale, segment_idx, segments, rng, workload
+                cluster_size,
+                workload.scale,
+                effective_asymmetry,
+                segment_idx,
+                segments,
+                rng,
+                workload,
             )
         elif workload.kind == "mixed":
             mat = _mixed_matrix(

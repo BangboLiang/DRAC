@@ -17,7 +17,11 @@ class SegmentMetrics:
     matching_error_p95: float
     network_utilization: float
     ocs_port_utilization: float
+    useful_capacity_gbps: float
     wasted_idle_capacity_gbps: float
+    total_provisioned_capacity_gbps: float
+    useful_ratio: float
+    waste_ratio: float
     symmetric_waste_gbps: float
     active_directional_ports: int
     releasable_directional_ports: int
@@ -76,6 +80,18 @@ def _wasted_idle_capacity(
     return float(np.sum(_bytes_per_ms_to_gbps(waste)))
 
 
+def _useful_capacity(
+    demand: np.ndarray, capacity_gbps: np.ndarray, completion: float
+) -> float:
+    if completion <= 0.0:
+        return 0.0
+    capacity_bytes_per_ms = _gbps_to_bytes_per_ms(capacity_gbps)
+    required = demand / max(completion, EPS)
+    useful = np.minimum(capacity_bytes_per_ms, required)
+    np.fill_diagonal(useful, 0.0)
+    return float(np.sum(_bytes_per_ms_to_gbps(useful)))
+
+
 def _symmetric_waste(
     demand: np.ndarray, realized_overlay_gbps: np.ndarray, completion_ms: float
 ) -> float:
@@ -128,6 +144,11 @@ def compute_segment_metrics(
     port_util, active_ports = _port_utilization(
         allocation.connection_units, int(net.per_node_port_budget)
     )
+    total_provisioned_capacity_gbps = float(np.sum(allocation.total_bandwidth))
+    useful_capacity_gbps = _useful_capacity(demand, allocation.total_bandwidth, completion)
+    wasted_idle_capacity_gbps = _wasted_idle_capacity(
+        demand, allocation.total_bandwidth, completion
+    )
     reserved_dir = int(
         net.directional_port_reserved
         if net.directional_port_reserved is not None
@@ -144,8 +165,18 @@ def compute_segment_metrics(
         matching_error_p95=match_p95,
         network_utilization=util,
         ocs_port_utilization=port_util,
-        wasted_idle_capacity_gbps=_wasted_idle_capacity(
-            demand, allocation.total_bandwidth, completion
+        useful_capacity_gbps=useful_capacity_gbps,
+        wasted_idle_capacity_gbps=wasted_idle_capacity_gbps,
+        total_provisioned_capacity_gbps=total_provisioned_capacity_gbps,
+        useful_ratio=(
+            useful_capacity_gbps / total_provisioned_capacity_gbps
+            if total_provisioned_capacity_gbps > 0.0
+            else 0.0
+        ),
+        waste_ratio=(
+            wasted_idle_capacity_gbps / total_provisioned_capacity_gbps
+            if total_provisioned_capacity_gbps > 0.0
+            else 0.0
         ),
         symmetric_waste_gbps=_symmetric_waste(
             demand, allocation.realized_overlay, completion

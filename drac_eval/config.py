@@ -85,6 +85,9 @@ class ExperimentConfig:
     workloads: List[WorkloadConfig] = field(default_factory=list)
     sweeps: SweepConfig = field(default_factory=SweepConfig)
     generate_figures: bool = True
+    save_matrices: bool = True
+    high_demand_tau: float = 1.5
+    high_demand_eta_fraction: float = 0.05
     figure_formats: List[str] = field(default_factory=lambda: ["png"])
     notes: str = ""
 
@@ -130,6 +133,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         workloads=workloads,
         sweeps=sweeps,
         generate_figures=bool(raw.get("generate_figures", True)),
+        save_matrices=bool(raw.get("save_matrices", True)),
+        high_demand_tau=float(raw.get("high_demand_tau", 1.5)),
+        high_demand_eta_fraction=float(raw.get("high_demand_eta_fraction", 0.05)),
         figure_formats=list(raw.get("figure_formats", ["png"])),
         notes=str(raw.get("notes", "")),
     )
