@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "name": "drac_rescue_experiments_v2",
+  "output_dir": "results/rescue_experiments_v2",
+  "seeds": [7, 19, 31],
+  "rank_counts": [8, 16, 32, 64, 128],
+  "endpoint_count": 32,
+  "asymmetry_level": 4.0,
+  "aggregation_hierarchy": {
+    "endpoints_per_server": 2,
+    "servers_per_tor": 2,
+    "tors_per_aggregation": 2
+  },
+  "aggregation_levels": ["endpoint", "server", "tor", "aggregation"],
+  "mapping_strategies": ["contiguous", "round_robin", "random"],
+  "normalization_modes": ["resource_equivalent", "deployment_specific"],
+  "endpoint_network": {
+    "base_capacity_gbps": 25.0,
+    "out_port_budget": 4,
+    "in_port_budget": 4,
+    "ocs_unit_bw_gbps": 100.0,
+    "global_ocs_budget": 32
+  },
+  "deployment_specific": {
+    "endpoint": {"base_bw_gbps": 25.0, "out_port_budget": 4, "in_port_budget": 4, "total_ocs_links": 32},
+    "server": {"base_bw_gbps": 100.0, "out_port_budget": 8, "in_port_budget": 8, "total_ocs_links": 32},
+    "tor": {"base_bw_gbps": 400.0, "out_port_budget": 16, "in_port_budget": 16, "total_ocs_links": 32},
+    "aggregation": {"base_bw_gbps": 1600.0, "out_port_budget": 32, "in_port_budget": 32, "total_ocs_links": 32}
+  },
+  "collective_schedule_models": [
+    "unidirectional_executable_ring",
+    "executable_bidirectional_ring",
+    "matrix_balancing_abstraction",
+    "pairwise_balancing_oracle"
+  ],
+  "chunk_count": 7,
+  "odd_chunk_rule": "extra_clockwise",
+  "intra_collective_reconfiguration": false,
+  "reconfig_delay_ms": 0.5,
+  "algorithms": [
+    "sym_ocs",
+    "drac_makespan_opt",
+    "sqrt_target_floor_greedy",
+    "proportional_target_floor_greedy"
+  ],
+  "port_budgets": [1, 2, 4, 6],
+  "omega_thresholds": [0.0, 0.05, 0.10, 0.20],
+  "solver_tolerance": 1e-10,
+  "benefit_epsilon": 1e-8,
+  "paper_config": "configs/drac_eval_paper.json",
+  "workloads": [
+    {"name": "tp", "kind": "tp", "segment_count": 3, "scale": 1.0, "tp_group_size": 8},
+    {"name": "dp", "kind": "dp", "segment_count": 3, "scale": 1.8, "dp_group_size": 8},
+    {"name": "mixed", "kind": "mixed", "segment_count": 3, "scale": 1.4, "mixed_weights": {"tp": 0.4, "dp": 0.6}},
+    {"name": "pp", "kind": "pp", "segment_count": 3, "scale": 0.9}
+  ]
+}

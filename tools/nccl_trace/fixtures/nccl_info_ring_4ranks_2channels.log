@@ -1,0 +1,12 @@
+# FIXTURE ONLY - representative NCCL INFO syntax, not a measurement.
+node0:1234:1234 [0] NCCL INFO comm init rank 0 nranks 4 nChannels 2
+node0:1234:1234 [0] NCCL INFO host node0 rank 0
+node0:1234:1234 [1] NCCL INFO host node0 rank 1
+node1:1234:1234 [2] NCCL INFO host node1 rank 2
+node1:1234:1234 [3] NCCL INFO host node1 rank 3
+node0:1234:1234 [0] NCCL INFO Channel 00/02 : 0 1 2 3
+node0:1234:1234 [0] NCCL INFO Channel 01/02 : 0 3 2 1
+node0:1234:1234 [0] NCCL INFO Trees [0] -1/-1/-1->0->1
+node0:1234:1234 [0] NCCL INFO Trees [1] -1/-1/-1->0->3
+node0:1234:1234 [0] NCCL INFO AllReduce bytes 16777216 algorithm Ring protocol Simple runtime 820.5 us
+node0:1234:1234 [0] NCCL INFO NET/Socket transport selected

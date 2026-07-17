@@ -1,0 +1,26 @@
+{
+  "version": 4,
+  "official_trace_directory": "data/atlahs",
+  "selected_traces": [
+    "Llama7B_N4_GPU16_TP1_PP1_DP16_BS32",
+    "Llama13B_N16_GPU64_TP4_PP2_DP8_VPP5_BS32",
+    "Llama7B_N32_GPU128_PP1_DP128_7B_BS128",
+    "Llama70B_N64_GPU256_TP1_PP8_DP32_70B_BS32"
+  ],
+  "download_raw_nsys": false,
+  "download_goal": true,
+  "gpus_per_node": 4,
+  "evidence_modes": ["ATLAHS_TRACE_DERIVED", "SIMULATED_TIMELINE", "HYPOTHETICAL_AGGREGATION"],
+  "window_sizes_ns": [100, 1000, 10000, 100000, 1000000, 10000000],
+  "link_rates_gbps": [100, 200, 400, 800],
+  "executed_link_rates_gbps": [400],
+  "aggregation_group_sizes": [1, 2, 4, 8, 16],
+  "mapping_strategies": ["contiguous", "round_robin", "random"],
+  "random_seeds": [0, 1, 2, 3, 4],
+  "awgr_epoch_ns": [100, 1000, 10000, 100000],
+  "guard_overhead_ns": [0, 10, 100, 1000],
+  "control_lookahead_epochs": [0, 1, 4],
+  "minimum_useful_payload_bytes": 4096,
+  "drac_upper_bound_enabled": true,
+  "output_directory": "results/rescue_experiments_v4_atlahs"
+}

@@ -1,0 +1,15 @@
+num_ranks 2
+
+rank 0 {
+l1: calc 100 cpu 0
+l2: send 64b to 1 tag 001 cpu 1 nic 0
+l2 requires l1
+l3: recv 32b from 1 tag 002 cpu 1 nic 0
+l3 requires l2
+}
+
+rank 1 {
+l1: recv 64b from 0 tag 001 cpu 1 nic 0
+l2: send 32b to 0 tag 002 cpu 1 nic 0
+l2 requires l1
+}

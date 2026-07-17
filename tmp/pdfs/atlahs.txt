@@ -1,0 +1,1648 @@
+arXiv:2505.08936v1  [cs.DC]  13 May 2025
+ATLAHS: An Application-centric Network Simulator T oolchain
+for AI, HPC, and Distributed S torage
+Siyuan Shen∗
+siyuan.shen@inf.ethz.ch
+ETH Zürich
+Zürich, Switzerland
+Tommaso Bonato∗
+tommaso.bonato@inf.ethz.ch
+ETH Zürich
+Zürich, Switzerland
+Zhiyi Hu
+zhiyihu@student.ethz.ch
+ETH Zürich
+Zürich, Switzerland
+Pasquale Jordan
+pasquale.jordan@inf.ethz.ch
+ETH Zürich
+Zürich, Switzerland
+Tiancheng Chen
+tiancheng.chen@inf.ethz.ch
+ETH Zürich
+Zürich, Switzerland
+Torsten Hoefler
+torsten.hoefler@inf.ethz.ch
+ETH Zürich
+Zürich, Switzerland
+ABSTRACT
+Network simulators play a crucial role in evaluating the perfor-
+mance of large-scale systems. However, existing simulators rely
+heavily on synthetic microbenchmarks or narrowly focus on spe-
+cific domains, limiting their ability to provide comprehensive per-
+formance insights. In this work, we introduce ATLAHS, a flexible,
+extensible, and open-source toolchain designed to trace real-world
+applications and accurately simulate their workloads. ATLAHS
+leverages the GOAL format to model communication and compu-
+tation patterns in AI, HPC, and distributed storage applications. It
+supports multiple network simulation backends and handles multi-
+job and multi-tenant scenarios. Through extensive validation, we
+demonstrate that ATLAHS achieves high accuracy in simulating
+realistic workloads (consistently less than 5% error), while signif-
+icantly outperforming AstraSim, the current state-of-the-art AI
+systems simulator, in terms of simulation runtime and trace size
+efficiency. We further illustrate ATLAHS’s utility via detailed case
+studies, highlighting the impact of congestion control algorithms
+on the performance of distributed storage systems, as well as the
+influence of job-placement strategies on application runtimes.
+1 INTRODUCTION
+Network simulators play a critical role in evaluating the perfor-
+mance and feasibility of large-scale supercomputing clusters and
+data centers, such as Meta’s $800 million data center [82], the Alps
+cluster at the Swiss National Supercomputing Center [20], or the
+exascale supercomputer El Capitan [53]. By creating configurable,
+repeatable environments that emulate traffic patterns and work-
+loads at scale, simulators allow for rapid prototyping and enable
+researchers and network architects to quickly identify potential
+bottlenecks and performance issues without building or modifying
+physical infrastructure. This capability is essential for designing
+and optimizing complex systems before deployment.
+This virtual exploration is particularly critical when develop-
+ing and assessing the effectiveness of novel network topologies,
+protocols, and standards, such as HammingMesh [ 36], SMaRTT-
+REPS [11, 12], and Ultra Ethernet [ 2]. For researchers and prac-
+titioners who lack access to large-scale systems, simulators pro-
+vide a practical and cost-effective way to evaluate new techniques.
+∗Both authors contributed equally to this work.
+… Time
+N0
+N1
+N2
+N3…
+N7
+N8
+N9
+N10…
+PP Victim Flow
+DP Ring Allreduce
+Node 7CompBWDDPPP
+CompDPPP Allreduce
+Pipeline parallelism (PP)affected by long running allreduceAllreduce
+ReceiveBWD
+B
+…
+Streams
+Node 0
+Send
+Streams
+ !   
+
+
+	
+"!
+
+
+
+
+	
+# 
+
+C
+A Ring allreducefor dataparallelism (DP)
+Layer 𝑳𝒏
+Layer 𝑳𝒏"𝟏
+Backpropagation
+Figure 1: A illustrates a space-time diagram of a realistic
+training scenario for Large Language Models (LLMs), showing
+overlapping communication from data parallelism (DP) and
+pipeline parallelism (PP). B depicts a network-level view
+demonstrating how PP victim flows become congested due
+to simultaneous DP ring allreduce communications within a
+two-level fat tree topology. C compares the performance of
+Swift and MPRDMA congestion control algorithms using two
+synthetic microbenchmarks and the LLM training workload.
+Percentages indicate the performance improvement (green)
+or degradation (red) of Swift relative to MPRDMA.
+However, many impactful networking studies primarily rely on syn-
+thetic microbenchmarks, such as incast and permutation [12, 34, 63].
+While useful for basic evaluations, these benchmarks often fail to
+accurately represent real-world workloads, potentially overlooking
+critical performance issues. Fig. 1 shows how realistic AI training
+Shen et al.
+GOAL Format𝐶!
+𝐶"𝑆
+𝐶#
+𝑅
+Trace Files
+Input ParametersNumber of RanksCollective Algorithm...
+ConfigurationNetwork TopologyLatency
+...
+BandwidthCC AlgorithmMTU
+Custom tracers and parsers can be added to support more applicationsWorkload SimulationScheduler
+Network Backend
+LogGOPSim
+...NS3htsim
+Scheduler issues sends to the network backend and is informed once the message is received
+Synthetic Workloads
+Decided based on configuration NCCL parameters such as topology, NCCL protocols, etc.
+Send
+Receive
+Calc
+Configurable job placement for multi-tenancy and multi-job scenarios.Applications
+HPC Storage
+Example: Azure Direct DriveCoordinatorBlock StorageMetadataLoad BalancerGateway
+Node
+Virtual Disk Client
+ApplicationReadWriteNode
+Application
+P2P, Collectives...MPI
+AINode
+GPU 1...
+GPU 0Stream 0AllreduceSendStream 1BroadcastRecv Inter-node and intra-node sends and receives
+Collective Algorithm
+PMPITracer
+NCCL Tracer
+Block I/O Tracer
+I/OMPINCCL
+Figure 2: Overview of the ATLAHS toolchain. Application and hardware components are represented in shades of red. Trace
+generation and GOAL format processing are shown in green. Simulation is depicted in blue. For consistency, these color schemes
+will be used throughout the paper in all figures and diagrams.
+workloads reveal shortcomings of the Swift [52] congestion control
+algorithm, which synthetic benchmarks alone do not capture. While
+Swift and MPRDMA [58] algorithms show comparable performance
+under synthetic benchmarks, AI traces analyzed with ATLAHS ex-
+pose Swift’s weakness in handling multi-hop congestion due to its
+single end-to-end delay measurement approach. When examining
+the total iteration time, Swift is approximately 4% slower, with com-
+putation partially masking the communication overhead. However,
+even modest slowdowns can accumulate significantly over many
+iterations, leading to substantial time and cost inefficiencies.
+While some papers incorporate traffic generated from real mi-
+croservices [80], such approaches, though more realistic, often fall
+short of capturing the temporal dynamics, burstiness, and interde-
+pendencies inherent in real-world traffic patterns. These limitations
+can obscure important insights, such as correlations between traffic
+flows or time-varying behaviors that impact network performance.
+Therefore, we emphasize that application traces are indispens-
+able for uncovering performance issues that synthetic microbench-
+marks might miss. An application-centric approach to gener-
+ating workloads for network simulators ensures that evalua-
+tions are robust and reliable in practical large-scale systems.
+Despite this need, many state-of-the-art (SOTA) network simula-
+tors lack intuitive interfaces for parsing and replaying real applica-
+tion traces [13, 28, 60, 65, 69, 81], often requiring users to implement
+custom traffic generators, which significantly increases complexity
+and development effort. Trace-based simulators that offer built-in
+support for application traces tend to focus narrowly on specific
+domains, rather than supporting general applications. For example,
+AstraSim [84] and SimAI [83] are tailored exclusively for AI appli-
+cations, whereas LogGOPSim [39], PHANTOM [87], and SMPI [18]
+are restricted to MPI applications in high-performance computing
+(HPC). Consequently, a simulation toolchain that provides a uni-
+fied interface to accommodate a broad spectrum of applications
+would enable researchers and network engineers to conduct more
+thorough and versatile performance evaluations.
+To this end, we introduce ATLAHS (Application-centric Net-
+work Simulator Toolchain for AI, HPC, and Distributed Storage), a
+toolchain designed to efficiently trace and simulate network traf-
+fic from a diverse range of applications. An overview of ATLAHS
+is shown in Fig. 2. Based on the LogGOPSim toolchain [ 39], AT-
+LAHS leverages Group Operation Assembly Language (GOAL) [40],
+which offers a unified representation of both computation and com-
+munication. This allows ATLAHS to not only generate synthetic
+microbenchmarks and traffic for applications in the aforementioned
+domains but also provide users with an intuitive interface to imple-
+ment their own trace parsers, enabling support for any applications.
+Furthermore, GOAL facilitates the integration and mixing of di-
+verse workloads, allowing users to easily adjust workload placement
+to emulate multi-job and multi-tenancy scenarios. When executing
+simulations, ATLAHS parses GOAL files, schedules operations, and
+offers the flexibility to select different network simulation backends
+based on user requirements. Users can choose message-level simu-
+lations for faster execution or packet-level simulations for higher
+accuracy. We validate ATLAHS’s accuracy across various backends
+against AstraSim, a SOTA AI simulator, and demonstrate practical
+use-cases through detailed case studies. These studies highlight
+how ATLAHS can evaluate critical factors such as the impact of
+congestion control algorithms on distributed storage system per-
+formance and how job-placement strategies influence application
+runtime. To foster open research and encourage broader adoption of
+ATLAHS, we publicly release a comprehensive collection of traces
+spanning numerous applications, domains, and configurations.
+The primary contributions of this work are as follows:
+(1) We develop ATLAHS, an open-source toolchain that em-
+phasizes the use of application traces over synthetic mi-
+crobenchmarks. This approach captures the complexity
+and dynamics of real-world workloads, leading to more
+comprehensive performance evaluations.
+(2) Extending the capability of the popular LogGOPSim toolchain,
+ATLAHS features several novel capabilities, including the
+integration of AI, HPC, storage workloads, flexible simu-
+lation backends, as well as the support for multi-job and
+multi-tenancy scenarios.
+(3) To support future research and reproducibility, we release
+a comprehensive collection of application traces spanning
+ATLAHS: An Application-centric Network Simulator T oolchain for A I, HPC, and Distributed S torage
+diverse domains and configurations, making them publicly
+available to the community.
+(4) Through extensive experimentation, we validate the accu-
+racy of the ATLAHS toolchain for a broad range of AI and
+HPC workloads, demonstrating that it achieves consistently
+high accuracy while significantly outperforming AstraSim.
+(5) We present detailed case studies illustrating the versatil-
+ity of ATLAHS: from analyzing the impact of congestion
+control algorithms on distributed storage systems to eval-
+uating the effects of different job placement strategies on
+application performance within computing clusters.
+2 BACKGROUND AND RELATED WORK
+2.1 Execution Trace Format
+Numerous execution trace formats exist in the field of HPC. The
+Open Trace Format (OTF) [46, 50], for instance, is a trace format
+designed for efficient storage and special support of parallel I/O. It
+is used in popular HPC tools such as Score-P [ 49], Scalasca [31],
+Vampir [47], and TAU [73]. While OTF offers certain capabilities
+for replay in simulators [42, 48], its complexity presents significant
+challenges, as it comprises archives of files serving various purposes.
+This complexity likely contributes to its limited adoption beyond
+traditional MPI applications, particularly in domains such as AI.
+DUMPI is another widely used trace format that captures MPI
+communication events. It is used in the Structural Simulation Toolkit
+(SST) and other simulator toolchains, such as ROSS/CODES [13, 60],
+to simulate and evaluate HPC system performance [ 3, 75]. How-
+ever, like OTF, DUMPI is primarily tailored for MPI-based HPC
+applications, making it less adaptable to non-MPI domains.
+Notably, most simulator toolchains rely on their own custom
+trace formats, including PHANTOM [87], PSINS [77], BigSim [89],
+SMPI [18], and SimGrid [14, 15]. However, these formats are tightly
+coupled to their respective simulators and are generally designed
+for HPC applications, particularly those based on MPI, further
+restricting their versatility across broader domains.
+In AI, Chakra introduces a unified trace schema, Chakra ET,
+to capture computation and communication in machine learning
+(ML) applications [17, 25, 74, 84]. It also supports generative AI-
+based synthesis for creating workloads. However, Chakra is tightly
+coupled with ML-specific semantics, limiting its flexibility and ex-
+cluding support for applications outside the ML domain, making it
+unsuitable for addressing the multi-domain requirement.
+Group Operation Assembly Language (GOAL) was introduced as
+a high-level abstraction that provides a unified way to represent
+both computation and communication workloads in distributed
+and parallel systems [40]. GOAL defines three types of tasks: send,
+receive, and computation. Each GOAL schedule is expressed as a
+directed acyclic graph (DAG), where vertices represent tasks and
+edges define their dependencies. Fig. 3 provides an example of a
+simple GOAL schedule. Users can assign tasks to distinct compute
+streams; if unspecified, tasks default to stream 0. This mechanism
+accurately represents parallel execution during simulation and facil-
+itates the flexible distribution of workloads across multiple process-
+ing streams as specified by the user. For historical reasons, compute
+streams are referred to using the label cpu. In addition, to improve
+rank 0 {l1: calc 100l2: calc 200 cpu0l3: calc 200 cpu1l2 requires l1l3 requires l1l4: send 10b to 1l4 requires l2l4 requires l3}
+A B𝑙1
+𝑙2𝑙3
+𝑙4
+calc 100
+calc 200calc 200
+send 10b
+Compute Stream 0
+ ComputeStream 1
+Figure 3: A shows an example GOAL schedule of node 0 in
+its textual format, while B shows the visualization of the
+same schedule as a DAG. Vertices in green are assigned to
+compute stream 0 to execute while vertex𝑙3 in teal is assigned
+to be executed on compute stream 1.
+storage and execution efficiency, GOAL schedules are stored and
+executed in a compact binary format.
+We chose GOAL as the intermediate trace format for ATLAHS
+for two main reasons. First, GOAL has been widely validated in
+prior work [21, 38, 39, 72], showing that its simple abstraction is
+sufficient to model and emulate network communication accurately.
+Second, its generality makes it analogous to Java bytecode, acting
+as a universal format to which traces from any application can
+be translated. This flexibility enables users to extend ATLAHS to
+new workloads by implementing custom tracers and parsers that
+produce GOAL-compliant output.
+2.2 Network Simulator Frameworks
+Over the years, numerous network simulators have been developed
+by industry and academia, broadly categorized into packet-level
+simulators, which track individual packet traversal, and message-
+level simulators , which abstract communication at the message
+level [10]. Packet-level simulators typically offer higher fidelity but
+incur significant computational overhead, while message-level sim-
+ulators emphasize scalability and efficiency. ATLAHS, as a unified
+toolchain, supports both simulation approaches, allowing users to
+flexibly select the simulator type best suited to their requirements.
+In this work, we focus on widely adopted simulators: htsim [65]
+and NS-3 [35, 69] as packet-level simulators, and LogGOPSim [39]
+(LGS) as the message-level simulator.
+A major challenge with existing simulators is the absence of a
+user-friendly, general-purpose workload specification mechanism.
+Each simulator, sometimes even different versions of the same sim-
+ulator, relies on its own workload definition approach. For instance,
+NS-3 typically requires workloads to be defined directly in C++, de-
+manding in-depth knowledge of internal components and making
+it difficult to model complex distributed workloads. While some
+variants, like the HPCC-modified NS-3 [55], introduce custom trace
+formats for datacenter workloads, they still lack intuitive support
+for expressing dependencies and computational overhead. These
+solutions are usually tailored to narrow use cases, rather than built
+as part of a general-purpose toolchain.
+Similarly, htsim allows users to define workloads via C++ or
+connection matrix files in its latest version [1]. While connection
+Shen et al.
+matrices provide a structured approach to workload specification,
+they remain limited in expressiveness, lacking support for compu-
+tation modeling, an efficient tagging system for operations, and
+built-in trace compression.
+On the other hand, LGS is a message-level simulator that ab-
+stracts communication interactions at a higher level, enabling effi-
+cient large-scale simulations. While LGS is well-suited and intended
+for HPC workloads, it lacks a standardized interface for broader do-
+mains, such as AI and storage systems. However, its input language,
+GOAL, provides all the necessary building blocks for building a
+generalized solution, as previously explained in Section 2.1.
+3 ATLAHS TOOLCHAIN
+3.1 Trace Collection & GOAL Generation
+As an application-centric toolchain, ATLAHS is designed to effi-
+ciently trace applications and generate their corresponding GOAL
+schedules. By default, it supports tracing and GOAL generation
+for applications from three key domains: AI, HPC, and distributed
+storage, as these domains dominate the workloads in modern HPC
+clusters and data centers. In the following sections, we provide a
+detailed explanation of how traces are collected and converted into
+GOAL files for applications from each of these domains.
+3.1.1 HPC. Given that ATLAHS extends LGS, which was origi-
+nally designed for HPC applications, we begin with a discussion
+of this domain to provide context for the GOAL generation pro-
+cess. Notably, in the field of HPC and scientific computing, MPI
+remains one of the most dominant and convenient programming
+models [45, 71]. Consequently, MPI applications, as well as hy-
+brid MPI and OpenMP applications, are the primary programming
+models supported for this significant category of workloads.
+MPI programs are traced using a lightweight tracing library
+named liballprof, which relies on the PMPI interface to record
+MPI operations, their arguments, and the start and end timestamps
+of each operation. By analyzing the differences between times-
+tamps of consecutive operations, the schedule generator, Sched-
+gen, infers the amount of computation performed between them.
+Additionally, Schedgen substitutes collective MPI operations with
+their corresponding point-to-point (P2P) algorithms based on user
+specifications, enabling greater flexibility in simulation. Detailed ex-
+planations and examples of this procedure are available in [39, 72].
+3.1.2 AI. To support GOAL generation for AI applications, we
+primarily target the NVIDIA Collective Communication Library
+(NCCL) [61] for two main reasons. First, NVIDIA’s hardware and
+software stack accounts for over 90% of the AI training market [29,
+59], making NCCL the de facto standard for collective communica-
+tion library in most AI workloads. Second, compared to alternatives,
+such as like AMD’s RCCL [4] and Intel’s oneCCL [41], NCCL offers
+a more mature ecosystem of tools and profilers, which significantly
+accelerated our development. Note that ATLAHS is not limited to
+NCCL, as execution traces from other CCLs can be easily supported
+by implementing compatible GOAL generators.
+Given the complexity of NCCL and the numerous components
+and configuration parameters involved, we structured the GOAL
+generation process into four stages, as illustrated by an example in
+Node 0
+GPU 0SMSMSMSM
+GPU 1
+Node 1
+GPU 2
+GPU 3TimelineNCCL Ring Broadcast (2MB)
+NCCL uses 1 SM
+Send to GPU2 (0.5MB)Send to GPU2 (0.5MB)Send to GPU2 (0.5MB)Send to GPU2 (0.5MB)
+Figure 4: Example of an AI application with 2 nodes and 4
+GPUs connected in a ring, where each GPU communicates
+with its designated receiver as indicated by the arrows. NCCL
+utilizes a single streaming multiprocessor (SM) to handle
+communication operations. Using the NCCL Simple protocol,
+when GPU 0 broadcasts 2 MB of data as the root, the data is
+divided into 4 chunks, and transmitted sequentially.
+Fig. 5. This structured approach ensures a modular design, making
+it easier to adapt and extend.
+Stage 1. NCCL and CUDA programming involve multiple layers
+and granularities of operations, with CUDA streams being the first
+level of parallel execution. A CUDA stream is a sequence of opera-
+tions that are executed in order on the GPU. By utilizing multiple
+streams, developers can overlap operations, enabling concurrent
+execution. Therefore, the first step in our GOAL generation process
+is to identify the kernels executed, determine their exact execution
+timing, and establish dependencies and parallelism between them.
+To achieve this, we use Nsight Systems, NVIDIA’s performance
+analysis tool [62], to profile GPU stream activity during AI appli-
+cation runtime. It produces detailed nsys report files that capture
+operations per stream and GPU. However, key details like the com-
+municator used by NCCL kernels are missing from the default
+output. To address this, we modify NCCL to add NVTX annota-
+tions [86], enabling collection of this information for later use. We
+selected Nsight Systems over custom tracers or alternatives due
+to its precision, efficiency, and minimal overhead, which makes it
+ideal for large-scale AI workloads.
+Stage 2. In the second stage, we iterate through the nsys report
+files for each GPU and analyze the CUDA streams. Since NCCL
+operations within a single stream must execute sequentially, we
+construct a linked list connecting each NCCL operation. Using
+timestamps, we then infer the computation between consecutive
+NCCL kernels, similar to the approach discussed in Section 3.1.1.
+To accurately represent the concurrency introduced by multiple
+CUDA streams, we insert dummy nodes with zero computational
+cost that connect the start and end vertices of each stream’s opera-
+tion list. Operations within different CUDA streams are assigned dis-
+tinct labels, ensuring they are mapped to separate compute streams
+during the subsequent GOAL generation stage (details of compute
+streams are described in Section 2.1). This explicit labeling enables
+ATLAHS: An Application-centric Network Simulator T oolchain for A I, HPC, and Distributed S torage
+Node 0
+AI App
+NCCL
+GPU 0
+GPU 1
+nsys profile
+NCCL with additional nvtxannotations
+Node 1
+GPU 2
+GPU 3
+STAGE 2
+STAGE 3
+Nsys Report Files
+...
+GPU 1
+Stream 0BcastSendStream 1Allreduce𝑡!𝑡"𝑡#𝑡$
+𝑡% 𝑡&
+GPU 0
+Stream DAGs
+...
+GPU 0
+GPU 1
+Stream 0
+Stream 1𝐷! 𝐷"Allreduce𝐶"
+SendBcast𝐶! Dummy
+Dummy
+Collective Decomposition DAGsCollectives are replaced with P2Palgorithms (i.e., sends and receives) according to various parameters.
+STAGE 4GOAL
+GPU 0
+GPU 1
+Node 0
+GPU 2
+GPU 3
+Node 1
+Group GPU DAGs into node DAGs and replace intra-node sendsand receiveswith calcvertices STAGE 1
+𝑡#−𝑡"
+𝑡$−𝑡%
+ GPU 0
+GPU 1
+GPU 2
+GPU 3
+Stream 0
+𝐶!
+𝑆!𝑆"
+⋮𝐶&
+𝐷!
+𝐶"
+𝑆#
+⋮𝐶'	
+𝐷"Stream 1Ops from different streams are assigned different CPU tags in GOAL
+Figure 5: An example showing the 4 stages GOAL file generation for large-scale distributed AI applications.
+the simulator to precisely model concurrent operation execution,
+preserving the realistic behavior of GPU-based workloads.
+Stage 3. Stage 3 is the most complex part of the GOAL generation
+process, as it requires decomposing NCCL collective operations into
+dependencies of send, receive, and computation tasks. Unlike MPI
+collectives, NCCL schedules vary significantly based on NCCL con-
+figuration parameters such as the number of channels, algorithm,
+and communication protocol, defined via NCCL_MAX_NCHANNELS,
+NCCL_ALGO, and NCCL_PROTO.
+Fig. 4 shows an example where an NCCL broadcast is decom-
+posed into four sequential sends due to buffer size limits. If the Low
+Latency (LL) protocol were used instead, the schedule would differ
+considerably. We systematically analyzed NCCL collectives across
+various parameter settings and integrated the resulting schedules
+into ATLAHS. Due to their complexity, we omit detailed break-
+downs here; full implementations are available in the source code1.
+Stage 4. In the final stage, DAGs from multiple GPUs are com-
+bined to form a single DAG per node by introducing dummy nodes,
+following the same approach as in Stage 2. This step can be per-
+formed to reflect the original system setup, or the GPU DAGs can
+be restructured to explore “what-if" scenarios. For instance, traces
+from an 8-GPU, 2-node setup can be restructured to simulate a
+4-node setup with 2 GPUs each, assuming the logical topology
+defined by NCCL_ALGO remains consistent.
+Once the GPU-to-node mappings are specified, we further refine
+the DAG by replacing send and receive operations between GPUs
+on the same node with computation (calc) vertices, since intra-
+node communication does not traverse the inter-node fabric. The
+computational cost of these replacements is determined based on
+profiling data from the specific GPUs. For example, in Fig. 5, the
+communication operations between GPUs 0-1, as well as GPUs 2-3,
+are replaced with computation vertices.
+3.1.3 Storage. Distributed storage systems differ significantly
+from AI and HPC applications in their underlying architecture. Stor-
+age applications typically run on virtual machines (VMs) hosted by
+cloud providers, where disk I/O requests are issued to virtual disks
+1GitHub link: https://github.com/spcl/atlahs.git
+Azure Direct DriveNode
+Application
+ReadWrite ...
+...
+CCS0
+ CCS1
+ CCSN
+MDS
+GS
+LSB
+Virtual Disk Client (VDC)BSS0
+BSS1
+ BSSM
+A
+Node
+CCSi
+BSSj
+𝑆!
+𝐶!𝑅!𝑆"
+𝐶"𝑅"𝑆#
+𝐶#𝑅#𝑆$
+𝑅$B
+Figure 6: A provides an overview of how applications in-
+teract with Azure Direct Drive. B presents a space-time
+diagram illustrating the sequence of operations involved in a
+read request. Sends and receives are depicted as dotted green
+blocks, while computation is shown as pastel green blocks.
+The process begins with the node contacting the Change Co-
+ordinator Service (CCS) to determine which Block Storage
+Service (BSS) holds the requested data. The node then sends
+a request to the corresponding BSS to retrieve the data.
+backed by a distributed storage system designed for redundancy and
+scalability. When an application initiates a read or write request, the
+virtualization layer translates it into block-level operations, which
+the storage system processes across multiple nodes.
+In this work, we focus specifically on the network communi-
+cation within the storage system, capturing the underlying data
+transfers between nodes. For a network simulator to effectively
+evaluate the performance of such an architecture, it must be capa-
+ble of simulating workloads and interactions between the various
+storage system components.
+As a first step, we collect traces from arbitrary applications using
+a custom block-level I/O tracer built on top of bpftrace [ 70], a
+Shen et al.
+dynamic tracing tool based on Linux’s eBPF framework [57]. Unlike
+traditional tools like blktrace [6], which produce raw, low-level data
+requiring significant postprocessing, bpftrace provides a scriptable
+interface for filtering I/O events in real-time with minimal overhead.
+The resulting traces are stored in the SPC trace file format [ 19],
+where each record corresponds to a single I/O command. This
+format is also used by the UMass Trace Repository [79].
+I/O requests are converted into a GOAL file based on the target
+storage architecture. ATLAHS includes built-in support for Azure
+Direct Drive, a block storage system developed by Microsoft [51].
+Fig. 6 provides a simplified overview, highlighting five key service
+components in addition to the host: Change Coordinator Service
+(CCS), Block Storage Service (BSS), Metadata Service (MDS), Gate-
+way Service (GS), and Software Load Balancer (SLB). Due to space
+constraints, we refer readers to Microsoft’s public resources for
+detailed descriptions [51]. As Direct Drive is proprietary, we made
+assumptions based on public documentation, and full implementa-
+tion details are available in our open-source toolchain.
+ATLAHS provides native support for Direct Drive, and its flexible
+and extensible framework allows network architects to evaluate a
+wide variety of distributed storage service architectures by imple-
+menting custom GOAL generators tailored to their own systems.
+3.2 Multi-job and Multi-tenant Scenarios
+To simulate multi-job workloads, where distinct applications are as-
+signed to separate nodes and run concurrently, we simply map each
+application’s GOAL DAG to its own nodes during GOAL generation,
+making this scenario easy to model.
+Multi-tenancy is common in cloud environments and is increas-
+ingly relevant in HPC and AI systems [54, 85]. Because GOAL rep-
+resents workloads as directed acyclic graphs (DAGs), it naturally
+supports modeling multi-tenant workloads. By merging DAGs from
+different applications and introducing dummy vertices, following
+the approach used in Stages 2 and 4 of Section 3.1.2, ATLAHS can
+simulate concurrency on shared nodes, enabling realistic evaluation
+of resource contention and communication overlap.
+It is important to note that while this approach effectively mod-
+els network contention in a multi-tenant environment, it does not
+fully capture the complexities introduced by virtualization over-
+head, memory subsystem interactions, or cache contention effects.
+Nonetheless, this method provides a lightweight and practical way
+to approximate multi-tenancy and analyze the resulting traffic pat-
+terns and their impact on application performance.
+3.3 Integration with Network Simulators
+One of the design goals of ATLAHS is to provide a flexible toolchain
+that can be easily integrated with a wide range of existing network
+simulators. To achieve this, we abstract away simulator-specific
+details through a unified interface that handles a minimal set of
+core operations: send, recv, calc, and a helper function called
+eventOver, which synchronizes simulation time with ATLAHS.
+Each operation can be implemented to target a particular simulator
+backend. Additionally, a simulator-specific initialization function,
+simulationSetup, configures aspects such as topology, conges-
+tion control, and load balancing algorithms. Fig. 7 illustrates this
+integration mechanism along with its corresponding pseudocode.
+Workload Simulation PipelineGOAL File𝐶!
+𝐶"𝑆
+𝐶#
+𝑅ConfigurationTopology
+...BandwidthLatency
+The core interfaces provide a unified method for simulation setup and event handling.
+ATLAHS Entry PointGOAL SchedulerATLAHS APIsendrecvcalc
+Network BackendLGShtsimNS3...
+Send
+Recv
+Calc classATLAHS_API {virtualvoidsimulationSetup();virtualvoideventOver(Event);virtualvoidsend(SendEvent);virtualvoidrecv(RecvEvent);virtualvoidcalc(CalcEvent);};...
+Figure 7: ALTAHS APIs and an overview of its code. In the
+figure on the left, we only indicate the 3 core operations.
+Just to provide an example, the full ATLAHS interface for htsim
+consists of about 350 lines of code, mostly used to implement the
+three core operations previously defined. Depending on the spe-
+cific network simulator this can be enough to cover most cases,
+although some simulators may require adding some corner cases
+when running specific scenarios.
+One key aspect to make ATLAHS work with any network simu-
+lator is that it needs to be in charge of driving the actual network
+simulator. To do so, we implement synchronization mechanisms to
+match the simulation time to the internal ATLAHS time. Our ap-
+proach simply uses the eventOver function to signal ATLAHS the
+current actual simulation time (on top of reporting the actual event
+that has finished). As long as a network simulator is capable of
+providing this information and supports the previously mentioned
+operation then it can easily be supported by ATLAHS.
+We release the ATLAHS documentation, APIs interface, and
+current backend integrations publicly on GitHub.
+4 TRACE DATASET
+Realistic application traces are critical for accurate network simula-
+tion and have been widely utilized in prior studies [24, 33, 39, 42, 56,
+60, 67, 72, 83, 84]. However, many traces remain unpublished or pri-
+marily focus on cluster-level workflows and job scheduling [16, 23,
+27, 68, 88], lacking the granularity required for simulating individ-
+ual application traffic. To bridge this gap and foster open research,
+we publicly release a curated collection of large-scale application
+traces at https://spcl.inf.ethz.ch/Research/Scalable_Networking/
+ATLAHS/. The collection includes both unprocessed trace files (e.g.,
+nsys reports, MPI traces) and corresponding GOAL representations,
+allowing users to experiment with and convert them into other
+formats if needed. Table 1 summarizes available traces, and we plan
+to continuously expand this repository.
+5 V ALIDATION
+To validate the accuracy of ATLAHS, we traced numerous AI and
+HPC applications and compared their measured runtimes against
+predictions from different network backends. For AI workloads,
+we additionally compared ATLAHS with AstraSim 2.0 [ 84], the
+current SOTA simulator for distributed ML systems. While we
+intended to include a comparison with SimAI [83], its source code
+was not fully publicly available at the time of writing. Furthermore,
+ATLAHS: An Application-centric Network Simulator T oolchain for A I, HPC, and Distributed S torage
+App Configuration
+Trace
+(MiB)
+GOAL
+(MiB)
+DLRM 4 GPUs 4 Nodes 13 0.765
+16 GPUs 4 Nodes 243 242
+64 GPUs 16 Nodes 1566 2155Llama 7B
+128 GPUs 32 Nodes 1652 4819
+Llama 70B 256 GPUs 64 Nodes 4451 3561
+MoE (Mistral)
+8x7B
+64 GPUs 16 Nodes 1112 524
+MoE 8x13B 128 GPUs 32 Nodes 8110 10054
+MoE 8x70B 256 GPUs 64 Nodes 21581 31902
+CloverLeaf 128 Procs 8 Nodes 4.1 5.7
+128 Procs 8 Nodes 21 27
+512 Procs 32 Nodes 132 171HPCG
+1024 Procs 64 Nodes 331 433
+128 Procs 8 Nodes 28 33
+432 Procs 27 Nodes 137 166LULESH
+1024 Procs 64 Nodes 351 488
+128 Procs 8 Nodes 3.9 5.6
+512 Procs 32 Nodes 16 22LAMMPS
+1024 Procs 64 Nodes 32 43
+128 Procs 8 Nodes 9.6 13
+512 Procs 32 Nodes 51 65ICON
+1024 Procs 64 Nodes 102 130
+128 Procs 8 Nodes 4.6 9.1
+OpenMX
+512 Procs 32 Nodes 32 59
+Table 1: Summary of the released execution traces and corre-
+sponding GOAL files from various applications across differ-
+ent system configurations.
+due to the lack of access to Azure’s Direct Drive, we showcase
+ATLAHS’s support for distributed storage systems through a case
+study presented in the next section.
+We note that for htsim we used the latest available public release
+as starting point, but we implement several improvements to dras-
+tically improve its performance while reducing the memory usage.
+From our testing, the runtime of complex traces is reduced from
+10× to 100× the after the improvements. Due to its better perfor-
+mance and usage by the Ultra Ethernet Consortium (UEC) [2], we
+focus on the ATLAHS htsim backend over NS-3 during validation.
+In the results, we refer to running ATLAHS with the LogGOPSim
+backend as ATLAHS LGS while ATLAHS with the htsim backend
+as ATLAHS htsim.
+5.1 Experimental Setup
+Traces for AI workloads were collected on the Alps supercomput-
+ing cluster, operated by the Swiss National Supercomputing Center
+(CSCS). Alps employs a Dragonfly topology [ 22] and consists of
+2,688 compute nodes, each featuring four NVIDIA Grace Hopper Su-
+perchips (GH200) interconnected via high-bandwidth 150 GB/s in-
+terconnect for intra-node communication and 25 GB/s per-direction
+Cray Slingshot interconnect for inter-node communication [ 30].
+All AI workloads were executed in a containerized environment
+built from NVIDIA’s PyTorch container (version 24.10), running on
+Ubuntu 22.04 with Python 3.10. We utilized a modified version of
+NCCL 2.20.5, extended with additional NVTX annotations.
+Traces for HPC workloads were obtained from a dedicated 188-
+node test-bed cluster managed by CSCS. This HPC cluster is config-
+ured in a fat-tree topology using 18 Mellanox SX6036 switches. Each
+node is equipped with a 20-core Intel Xeon E5-2660 v2 CPU, 32 GB
+DDR3 RAM, and a ConnectX-3 56 Gbit/s NIC, running CentOS 7.3.
+The software stack utilized includes MPICH 4.1.2 and UCX 1.16.0,
+with the entire stack and all applications compiled using GCC 11.4.0.
+HPC applications were executed in a hybrid MPI+OpenMP config-
+uration, with each node running one MPI rank complemented by
+16 OpenMP threads.
+Both the ATLAHS and AstraSim were executed on a dedicated
+machine equipped with an AMD EPYC 9654 96-core 3.7 GHz CPU
+and 375 GB of memory.
+ATLAHS htsim employs MPRDMA [58] as its congestion control
+mechanism, uses a buffering capacity of 1 MiB per port, and sets
+𝐾Min and𝐾Max to 20% and 80% of the queue size, respectively.
+5.2 AI
+For the AI workloads, we primarily focused on the training of Large
+Language Models (LLMs), as these are among the most prevalent
+and communication-intensive applications in modern AI. Addi-
+tionally, LLM training utilizes a diverse range of parallelization
+strategies, making it particularly suitable for thoroughly evaluating
+the accuracy of ATLAHS [7, 8, 26]. We compared ATLAHS with
+AstraSim using a nightly build from February 4th, 2025. To ensure a
+fair evaluation, Chakra traces for AstraSim were generated directly
+from raw PyTorch and Kineto traces [66], thus guaranteeing identi-
+cal execution patterns in both simulators. To reduce measurement
+variability, we ran each training workload for 5 warm-up itera-
+tions before collecting traces from the subsequent 2 iterations. Each
+experiment was conducted 5 times, and the presented results are
+averaged across these trials. Additionally, we calculated the percent-
+age of non-overlapped computation to quantify the communication
+intensity of each workload.
+Since sends and receives are executed on GPU for NCCL opera-
+tions, we cannot directly obtain the LogGOPS [5, 39] parameters
+with tools such as Netgauge [37], we estimated the values of the
+parameters from the benchmarking works of Fusco et. al [30], De
+Sensi et al. [22], and Groves et al. [32]. The final values of LogGOPS
+parameters are as follows:𝐿 = 3700,𝑜 = 200,𝑔 = 5,𝑂 = 0,𝐺 = 0.04,
+and𝑆 = 0, and the units will be in 𝑛𝑠. The parameters we set for
+AstraSim emulate the real tracing setup as much as possible; details
+can be found in the source code we release. Throughout the experi-
+ments, we configure ATLAHS htsim to also match these parameters
+used by ATLAHS LGS.
+Fig. 8 presents validation results across various distributed train-
+ing configurations using the Llama [ 78] and Mixture of Experts
+(MoE) [43] architectures.
+Despite carefully adhering to all provided guidelines for trace
+generation [66], AstraSim only executed successfully for two config-
+urations, encountering runtime errors in all other scenarios across
+different network backends. We speculate that these issues arise
+because AstraSim’s current support for real execution traces is pri-
+marily limited to data-parallel workloads. AstraSim provides two
+Shen et al.
+Llama 7B
+16 GPUs 4 Nodes
+TP1 PP1 DP16
+Batch size 32
+Llama 7B
+128 GPUs 32 Nodes
+TP1 PP1 DP128
+Batch size 128
+Llama 70B
+256 GPUs 64 Nodes
+TP1 PP8 DP32
+Batch size 32
+Mistral 8x7B
+64 GPUs 16 Nodes
+TP1 PP8 DP8 EP1
+Batch size 32
+MoE 8x13B
+128 GPUs 32 Nodes
+TP4 PP4 DP8 EP4
+Batch size 128
+MoE 8x70B
+256 GPUs 64 Nodes
+TP4 PP8 DP8 EP8
+Batch size 128
+0
+2
+4
+6
+8
+10
+12
+14
+16
+18Time / Training Iteration (s)
+53.8% 14.2% 9.9% 14.3%
+16.9% 5.3%1.0% -1.8%
+-1.4%
+-2.1%
+-3.4%
+-4.8%
+0.3% -0.4%
+-1.7%
+-4.9%
+-3.0%
+-4.8%
+27.0% 125.5%
+src and dest have
+the same address
+src and dest have
+the same address
+src and dest have
+the same address
+src and dest have
+the same address
+Non-overlapped Computation
+Communication & Synchronization
+Predicted (ATLAHS LGS)
+Predicted (ATLAHS htsim)
+Predicted (AstraSim Congestion Unaware)
+Figure 8: Comparison of measured runtimes against predicted runtimes from ATLAHS and AstraSim for various AI training
+workloads. The third row in the x-axis labels indicates the configuration of the parallelization strategies, where TP stands for
+tensor parallelism, PP for pipeline parallelism, DP for data parallelism, and EP for expert parallelism. Blue bars show actual
+measured runtimes, broken down into non-overlapped computation (dark blue) and communication/synchronization time
+(light blue). Percentages above the dark blue bars denote the proportion of non-overlapped computation in each workload,
+while percentages in red indicate the prediction error relative to the measured runtime.
+additional backends: the congestion-aware backend and the NS-3
+backend. However, the congestion-aware backend currently sup-
+ports only a 1-dimensional topology, resulting in significant predic-
+tion errors when used with realistic multi-dimensional topologies,
+making fair comparisons infeasible. In addition, attempts to uti-
+lize the NS-3 backend consistently resulted in segmentation faults,
+preventing the collection of meaningful results.
+We also note that ATLAHS consistently outperforms AstraSim in
+terms of simulation accuracy (both LGS and htsim) and speed (for
+LGS) for the two scenarios where AstraSim successfully executes.
+While not depicted in the figures, ATLAHS LGS achieves signifi-
+cantly shorter simulation times compared to AstraSim (Congestion
+Unaware backend). Specifically, in the 4-node scenario, ATLAHS
+LGS completes the simulation in 5.50 seconds, whereas AstraSim
+takes 76.63 seconds (13.9× speedup). ATLAHS htsim completes in
+180.01 seconds but it is not easily comparable being a more ex-
+pensive packet-level simulator. Similarly, for the 32-node scenario,
+ATLAHS LGS completes the simulation in 232.20 seconds com-
+pared to AstraSim’s 636.87 seconds (2.7× speedup). ATLAHS htsim
+completes the simulation in 5100.43 seconds. All reported results
+represent averages across five independent trials.
+Llama 7B
+4 Nodes 16 GPUs
+TP1 PP1 DP16
+Batch size 32
+Llama 7B
+32 Nodes 128 GPUs
+TP1 PP1 DP128
+Batch size 128
+Llama 70B
+64 Nodes 256 GPUs
+TP1 PP8 DP32
+Batch size 32
+Mistral (MoE) 8x7B
+16 Nodes 64 GPUs
+TP1 PP8 DP8 EP1
+Batch size 32
+MoE 8x13B
+32 Nodes 128 GPUs
+TP4 PP4 DP8 EP4
+Batch size 128
+MoE 8x70B
+64 Nodes 256 GPUs
+TP4 PP8 DP8 EP8
+Batch size 128
+0
+20
+40
+60
+80
+100Trace Size (GiB)
+0.2 4.7 3.5 0.5
+9.8
+31.2
+2.1
+18.1
+6.1 5.4
+42.7
+79.4
+9.0x
+3.8x
+1.8x 10.6x
+4.4x
+2.5xGOAL (ATLAHS)
+Chakra (AstraSim)
+Figure 9: Trace size comparison of GOAL and Chakra. The
+green labels above each pair of bars indicate the trace size
+ratio of GOAL relative to Chakra.
+In addition, we compared the trace sizes generated by ATLAHS
+and AstraSim, and the results are presented in Fig. 9. We observe
+that the GOAL files utilized by ATLAHS are consistently and no-
+tably smaller than the Chakra files used by AstraSim. Although
+Chakra files contain additional information, such as data on com-
+pute kernels, this extra storage overhead does not appear to yield
+improvements in prediction accuracy.
+In this section, we validated the accuracy of ATLAHS with differ-
+ent backends across a range of realistic LLM training scenarios in
+the SOTA supercomputing cluster. Furthermore, our results show
+that ATLAHS consistently outperforms AstraSim, one of the most
+popular AI system simulators, not only in terms of simulation ac-
+curacy and speed, but also in the efficiency of trace storage. These
+advantages highlight ATLAHS’s capability as an effective toolchain
+for network performance evaluation for AI workloads.
+5.3 HPC
+We measured the LogGOPS parameters using Netgauge [37]. The
+resulting values are𝐿 = 3000,𝑜 = 6000,𝑔 = 0,𝐺 = 0.18,𝑂 = 0, and
+𝑆 = 256000. To validate ATLAHS, we selected HPC applications
+spanning a wide spectrum of scientific domains, including weather
+and climate simulation (ICON) [ 64], hydrodynamics simulation
+(LULESH), and molecular dynamics (LAMMPS) [76], across various
+node configurations. For each application and configuration, the
+runtime was averaged over 10 independent trials, and the dataset
+includes both weak scaling and strong scaling scenarios.
+Fig. 10 presents the validation results. It is worth noting that
+while the prediction error tends to increase slightly for ATLAHS
+LGS as the number of processes and nodes scales up, the error
+remains consistently below 5% across all cases and applications.
+On the other hand, ATLAHS htsim does not seem to be affected
+negatively by the growing scale and also keeps its error rate always
+below 5%. This demonstrates that ATLAHS effectively captures
+the underlying communication and computation dynamics across
+diverse HPC workloads, maintaining high accuracy over a broad
+range of application domains and while using different backends.
+ATLAHS: An Application-centric Network Simulator T oolchain for A I, HPC, and Distributed S torage
+CloverLeaf
+(128/8)
+HPCG
+(128/8)
+HPCG
+(512/32)
+HPCG
+(1024/64)
+LULESH
+(128/8)
+LULESH
+(432/27)
+LULESH
+(1024/64)
+LAMMPS
+(128/8)
+LAMMPS
+(512/32)
+LAMMPS
+(1024/64)
+ICON
+(128/8)
+ICON
+(512/32)
+ICON
+(1024/64)
+OpenMX
+(128/8)
+OpenMX
+(512/32)
+0
+5
+10
+15
+20
+25
+30Time (s)
+93.4%
+84.1%
+69.5%
+56.5%
+92.1%
+90.2%
+91.3%
+80.8%
+76.9%
+76.4%
+92.1%
+79.3%
+69.0%
+87.7%
+84.6%0.2% -2.1%
+1.7%
+2.7%
+0.6% 0.6% 3.9% -2.7%
+-0.6%
+1.1%
+0.1%
+-1.9%
+-3.6%
+-0.5%
+-1.1%
+-0.5% -3.7%
+-0.4%
+0.7%
+-2.2% -5.2% -4.1% -2.9%
+-0.0%
+2.2%
+0.2%
+-1.8%
+-2.3%
+-0.7%
+-2.2%
+Weak Scaling Strong ScalingNon-overlapped Computation
+Communication & Synchronization
+Predicted (ATLAHS LGS)
+Predicted (ATLAHS HTSIM)
+Figure 10: Comparison of measured and ATLAHS-predicted runtimes for HPC applications from various domains. The second
+row of the x-axis labels indicates the number of processes and nodes used in each experiment (processes/nodes). Percentages
+inside the dark blue bars denote the proportion of non-overlapped computation in each workload. Percentages in red above
+represent the prediction error of ATLAHS relative to the measured runtime.
+6 CASE STUDIES
+Experiments in this section will be designed to showcase different
+functionalities of ATLAHS for AI, HPC, and storage applications.
+Moreover, we will also focus on benefits and downsides for different
+ATLAHS backends.
+6.1 Effect of CC on Distributed Storage Requests
+MPRDMA NDP MPRDMA NDP
+0
+1
+2
+3
+4
+5
+6
+7MCT (µs) 2.4 µs
+1.5 µs
+0.1 µs
+2.5 µs
+1.8 µs
+0.1 µs
+4.0 µs
+2.8 µs
+0.2 µs
+7.1 µs
+3.8 µs
+0.3 µs
+No Oversubscription 8:1 Oversubscription
+Max
+99th Percentile
+Mean
+Figure 11: Comparison of the Message Completion Time
+(MCT) for storage traffic under different topologies and run-
+ning different congestion control algorithms.
+We now present a use case of ATLAHS related to storage traf-
+fic and the Direct Drive architecture described in Section 3.1.3.
+Specifically, we simulate 5k storage operations generated from the
+Financial distribution of the UMass collection [ 79]. We compare
+two congestion control algorithms in ATLAHS htsim: MPRDMA,
+a sender-based algorithm, akin to DCTCP but operating on a per-
+packet basis, and NDP, a receiver-based algorithm. For this com-
+parison, we employ two similar fat tree topologies: one with a fully
+provisioned network and one with an 8:1 oversubscription ratio
+between Tor switches and Core switches. In the fully provisioned
+topology, both algorithms perform similarly; however, in the over-
+subscribed case, NDP’s performance degrades significantly, with
+the mean Message Completion Time (MCT) increasing by 14%, and
+the 99th percentile and maximum MCT rising by 35% and 77%,
+respectively. This degradation occurs because NDP, and receiver-
+based algorithms in general, struggle with in-network congestion
+occurring away from the receiver, which is evident under oversub-
+scribed conditions. The authors of NDP acknowledge these issues,
+and recent work has tried to combine sender-based and receiver-
+based algorithms to leverage the strengths of both approaches [12].
+This example illustrates one of many potential applications of
+ATLAHS for network engineers. However, since the traces that
+ATLAHS generates are of a general GOAL format, we envision
+use cases that could potentially also go behind pure networking
+applications or what we envisioned in this paper.
+6.2 ATLAHS LGS vs ATLAHS htsim
+In Section 5, we observed that the performance of ATLAHS LGS
+and ATLAHS htsim is generally comparable and within 1-2% of
+each other for all experiments. This was only possible because of a
+series of assumptions that made ATLAHS LGS shine: the topology
+we were considering was fully provisioned and symmetric, the com-
+putation component was generally good at "masking" networking
+inefficiency, the collectives were designed to limit incast scenarios
+and we assumed no packet drops because of corruption or failures.
+If these assumptions are not met, ATLAHS LGS would likely
+struggle, to different degrees, to provide accurate predictions. For
+example, in Fig. 12, we show this by simulating Llama 7B first on the
+same fully provisioned topology as before and then with a topology
+with a 4:1 oversubscription between the ToR and Core switches.
+Since ATLAHS LGS is not capable of supporting arbitrary topolo-
+gies, we set 𝐺 = 0.04 for both configurations, as the theoretical
+injection bandwidth is unchanged even if less up-links are available
+in the oversubscribed topology. This naturally results in a loss of
+accuracy since ATLAHS LGS is oblivious to the decrease in avail-
+able bandwidth from ToR to Core switches. As shown on the left
+of Fig.12, we observe that, for no oversubscription, both perform
+well and within 1% of each other. However, when running the 4:1
+oversubscribed topology, the difference jumps to over 120%. This
+is due to significant packet drops on congested uplinks (visualized
+on the right of Fig. 12), which severely delay message delivery and
+inflate the total runtime.
+Moreover, using packet-level simulators enables network engi-
+neers to gather fine-grained details, such as the total number of
+Shen et al.
+No Oversubscription 4:1 Oversubscription
+T opology Configuration
+0
+1
+2
+3
+4Time For Training Iteration (s)
+-0.5% -120.3%
+ATLAHS LGS
+ATLAHS htsim
+No Oversubscription 4:1 Oversubscription
+T opology Configuration
+0.00
+0.25
+0.50
+0.75
+1.00
+1.25
+1.50
+1.75
+2.00T otal Packet Drops
+1e8
+Figure 12: Comparison of the runtime of ATLAHS LGS and
+ATLAHS htsim when using different network topologies. The
+right plot showcases a possible statistic (packet losses) that
+only packet-level simulators can provide.
+drops, comprehensive fairness statistics, and queue stability met-
+rics, among other insights. Only this kind of detailed analysis, for
+example, enabled the analysis for storage presented in Section 6.1.
+However, this does not undermine the value of ATLAHS LGS. As
+previously demonstrated, it can deliver high accuracy under ideal
+conditions, and even when operating outside its ideal parameters,
+it provides a useful approximation with the significant benefit of
+being considerably faster than packet-level simulators (in most
+cases ATLAHS LGS is 10-50x faster than ALTAHS htsim).
+6.3 Effect of Job Placement in an HPC Cluster
+As discussed in Section 3.2, ATLAHS also provides the possibility of
+merging together different traces from different applications using
+several strategies for allocation.
+To demonstrate this capability, Fig.13 shows a scenario where an
+AI application (Llama) and an HPC application (LULESH) share a
+cluster. We use the same oversubscribed topology from the previous
+example and evaluate both workloads using ATLAHS with the ht-
+sim backend. In the “Packed Allocation” strategy, nodes are assigned
+sequentially to each job, keeping communication mostly local and
+minimizing core network usage. Conversely, in the “Random Al-
+location” strategy, nodes are assigned without locality, increasing
+inter-node distances and load on the oversubscribed core. As a
+result, Llama experiences a 36% increase in runtime under random
+allocation. LULESH sees a smaller impact, due to its limited amount
+of non-overlapped computation, as shown in Fig.10. This example
+highlights the value of simulating not just individual applications,
+but the full execution pipeline, including job placement, topology
+awareness, and background interference.
+7 DISCUSSION AND EXTENSIONS
+One aspect currently outside the scope of ATLAHS is detailed
+hardware simulation, such as modeling GPU compute kernels and
+interactions involving memory subsystems, which are featured in
+AstraSim. This exclusion is a deliberate design choice intended to
+prioritize the efficiency of network simulation. As demonstrated in
+our validation results, representing non-communication tasks sim-
+ply as calc operations between communication events is sufficient
+to achieve accurate runtime estimations for network workloads.
+ATLAHS allows users to adapt traces gathered from one hardware
+platform to simulate another platform by applying a scaling factor
+Packed Allocation Random Allocation
+Allocation T ype
+0
+2
+4
+6Simulated Runtime (s)
++36%
++2%Llama 
+LULESH
+Figure 13: Comparing the runtime of different job allocation
+strategies when running two applications simultaneously
+(Llama and LULESH).
+derived from profiling both systems. Specifically, users can mea-
+sure the relative performance difference and scale all calc values
+accordingly to approximate computations on different hardware.
+Several areas of ATLAHS could benefit from further improve-
+ment. First, when GOAL files are generated from NCCL traces,
+data dependencies among CUDA kernels across streams are not
+currently captured. This simplification may result in inaccuracies
+related to computation and communication overlap, although net-
+work communication metrics remain accurate. Future work will
+address this by explicitly modeling CUDA kernel dependencies
+during GOAL generation.
+Due to the nature of the GOAL format, ATLAHS currently does
+not support dynamically scheduled communication operations.
+Although our validation demonstrates that this limitation does
+not significantly impact the accuracy of simulating NCCL-based
+workloads, it may pose challenges for large-scale Graph neural
+networks (GNNs) training [9], programming frameworks such as
+Charm++ [44] or fault-tolerant protocols in distributed storage sys-
+tems, where communication patterns are inherently dynamic. In
+future extensions, we aim to enhance GOAL by incorporating dy-
+namic scheduling capabilities, thereby enabling ATLAHS to support
+a broader spectrum of applications and scenarios.
+8 CONCLUSION
+In this work, we introduced ATLAHS, an application-centric simula-
+tion toolchain designed to bridge the gap between realistic workload
+modeling and network performance evaluation across AI, HPC, and
+distributed storage systems. By supporting trace-based simulation
+through the GOAL format, ATLAHS enables accurate modeling of
+communication and computation patterns of a diverse spectrum
+of real applications. Our toolchain is highly modular and flexible,
+supporting multiple network simulation backends, and providing
+built-in support for multi-job and multi-tenant scenarios. We val-
+idated ATLAHS across a diverse set of LLM and HPC workloads,
+demonstrating consistently high simulation accuracy, with errors
+under 5%, while outperforming SOTA frameworks such as AstraSim
+in both runtime efficiency and trace sizes.
+Beyond validation, we demonstrated the utility of ATLAHS
+through detailed case studies. These highlight how congestion con-
+trol algorithms can affect performance in large-scale distributed
+ATLAHS: An Application-centric Network Simulator T oolchain for A I, HPC, and Distributed S torage
+storage systems, and how job placement strategies influence perfor-
+mance across shared compute clusters. These insights underscore
+ATLAHS’s utility not only as a simulation framework, but also as a
+practical design and performance assessment tool for researchers
+and system architects seeking to optimize real-world large-scale
+systems under realistic workloads.
+By releasing ATLAHS together with an extensive collection of
+application traces, we hope to foster broader community engage-
+ment and advance research into network performance evaluation.
+We hope ATLAHS will empower researchers and practitioners to
+conduct more accurate, realistic simulations, ultimately guiding the
+networking design of more efficient large-scale systems.
+9 ACKNOWLEDGMENTS
+This project received funding from the European Research Council
+(ERC) under the European Union’s Horizon 2020 research and in-
+novation program (grant agreement PSAP, No. 101002047). We also
+thank the Swiss National Supercomputing Center (CSCS) for pro-
+viding the computational resources used in this work. The authors
+used ChatGPT-4o and 4.5 to assist with light editing and proof-
+reading throughout the manuscript. All content and ideas are the
+original work of the authors.
+REFERENCES
+[1] [n. d.]. Broadcom htsim repository. https://github.com/Broadcom/csg-htsim.
+Accessed: 2025-02-13.
+[2] [n. d.]. Ultra Ethernet Consortium. https://ultraethernet.org/. Accessed: 2025-
+01-13.
+[3] Helgi Adalsteinsson, Scott Cranford, David A. Evensky, Joseph P. Kenny, Jackson
+Mayo, Ali Pinar, and Curtis L. Janssen. 2010. A Simulator for Large-Scale Parallel
+Computer Architectures. Int. J. Distrib. Syst. Technol. 1, 2 (April 2010), 57–73.
+[4] Advanced Micro Devices, Inc. 2025. ROCm Communication Collectives Library
+(RCCL) Documentation. https://rocm.docs.amd.com/projects/rccl/en/latest/what-
+is-rccl.html Accessed: 2025-01-28.
+[5] Albert Alexandrov, Mihai F. Ionescu, Klaus E. Schauser, and Chris Scheiman.
+1995. LogGP: incorporating long messages into the LogP model—one step closer
+towards a realistic model for parallel computation. In Proceedings of the Seventh
+Annual ACM Symposium on Parallel Algorithms and Architectures (Santa Barbara,
+California, USA) (SPAA ’95). Association for Computing Machinery, New York,
+NY, USA, 95–105. https://doi.org/10.1145/215399.215427
+[6] Jens Axboe. 2005. blktrace: A Block I/O Tracing Mechanism for Linux. https:
+//www.kernel.org/doc/Documentation/block/blktrace.txt. Accessed: February
+04, 2025; an open-source tool for tracing block I/O events in Linux.
+[7] Tal Ben-Nun and Torsten Hoefler. 2019. Demystifying Parallel and Distributed
+Deep Learning: An In-depth Concurrency Analysis. ACM Comput. Surv. 52, 4,
+Article 65 (Aug. 2019), 43 pages.
+[8] Maciej Besta, Julia Barth, Eric Schreiber, Ales Kubicek, Afonso Catarino, Robert
+Gerstenberger, Piotr Nyczyk, Patrick Iff, Yueling Li, Sam Houliston, Tomasz
+Sternal, Marcin Copik, Grzegorz Kwaśniewski, Jürgen Müller, Łukasz Flis, Hannes
+Eberhard, Hubert Niewiadomski, and Torsten Hoefler. 2025. Reasoning Language
+Models: A Blueprint. arXiv:2501.11223 [cs.AI] https://arxiv.org/abs/2501.11223
+[9] Maciej Besta and Torsten Hoefler. 2023. Parallel and Distributed Graph Neural
+Networks: An In-Depth Concurrency Analysis. arXiv:2205.09702 [cs.LG] https:
+//arxiv.org/abs/2205.09702
+[10] Maciej Besta, Marcel Schneider, Salvatore Di Girolamo, Ankit Singla, and Torsten
+Hoefler. 2021. Towards Million-Server Network Simulations on Just a Laptop.
+arXiv:2105.12663 [cs.NI] https://arxiv.org/abs/2105.12663
+[11] Tommaso Bonato, Abdul Kabbani, Ahmad Ghalayini, Michael Papamichael,
+Mohammad Dohadwala, Lukas Gianinazzi, Mikhail Khalilov, Elias Acher-
+mann, Daniele De Sensi, and Torsten Hoefler. 2025. REPS: Recycled En-
+tropy Packet Spraying for Adaptive Load Balancing and Failure Mitigation.
+arXiv:2407.21625 [cs.NI] https://arxiv.org/abs/2407.21625
+[12] Tommaso Bonato, Abdul Kabbani, Daniele De Sensi, Rong Pan, Yanfang Le,
+Costin Raiciu, Mark Handley, Timo Schneider, Nils Blach, Ahmad Ghalayini,
+Daniel Alves, Michael Papamichael, Adrian Caulfield, and Torsten Hoefler. 2024.
+FASTFLOW: Flexible Adaptive Congestion Control for High-Performance Data-
+centers. arXiv:2404.01630 [cs.NI] https://arxiv.org/abs/2404.01630
+[13] C.D. Carothers, D. Bauer, and S. Pearce. 2000. ROSS: a high-performance, low
+memory, modular time warp system. In Proceedings Fourteenth Workshop on
+Parallel and Distributed Simulation . 53–60. https://doi.org/10.1109/PADS.2000.
+847144
+[14] Henri Casanova, Arnaud Giersch, Arnaud Legrand, Martin Quinson, and Frédéric
+Suter. 2025. Lowering entry barriers to developing custom simulators of dis-
+tributed applications and platforms with SimGrid. Parallel Comput. 123 (2025),
+103–125. https://doi.org/10.1016/j.parco.2025.103125
+[15] Henri Casanova, Arnaud Legrand, and Martin Quinson. 2008. SimGrid: A
+Generic Framework for Large-Scale Distributed Experiments. In Tenth Inter-
+national Conference on Computer Modeling and Simulation (uksim 2008) . 126–131.
+https://doi.org/10.1109/UKSIM.2008.28
+[16] Abhishek Chard, R. G. Dreslinski, Thomas F. Wenisch, Greg Ganger, and An-
+drew A. Chien. 2018. On the Diversity of Cluster Workloads and Its Impact on
+Research Results. In 2018 USENIX Annual Technical Conference (USENIX ATC 18) .
+533–546. https://www.pdl.cmu.edu/ATLAS/ Includes LANL Mustang, Trinity,
+and Two Sigma traces.
+[17] Jaehong Cho, Minsu Kim, Hyunmin Choi, Guseul Heo, and Jongse Park. 2024.
+LLMServingSim: A HW/SW Co-Simulation Infrastructure for LLM Inference
+Serving at Scale. In 2024 IEEE International Symposium on Workload Characteri-
+zation (IISWC). 15–29. https://doi.org/10.1109/IISWC63097.2024.00012
+[18] Pierre-Nicolas Clauss, Mark Stillwell, Stephane Genaud, Frederic Suter, Henri
+Casanova, and Martin Quinson. 2011. Single Node On-Line Simulation of MPI Ap-
+plications with SMPI. In 2011 IEEE International Parallel & Distributed Processing
+Symposium. 664–675. https://doi.org/10.1109/IPDPS.2011.69
+[19] Storage Performance Council. 2025. SPC Trace File Format Specification. https:
+//skulddata.cs.umass.edu/traces/storage/SPC-Traces.pdf. Accessed: 2025-01-22.
+[20] CSCS. [n. d.]. New Research Infrastructure: ’Alps’ Supercomputer Inaugurated.
+Swiss National Supercomputing Center ([n. d.]). https://www.cscs.ch/publications/
+news/2024/new-research-infrastructure-alps-supercomputer-inaugurated
+[21] Daniele De Sensi, Tiziano De Matteis, Konstantin Taranov, Salvatore Di Girolamo,
+Tobias Rahn, and Torsten Hoefler. 2022. Noise in the Clouds: Influence of Net-
+work Performance Variability on Application Scalability. Proc. ACM Meas. Anal.
+Comput. Syst. 6, 3, Article 49 (dec 2022), 27 pages. https://doi.org/10.1145/3570609
+[22] Daniele De Sensi, Lorenzo Pichetti, Flavio Vella, Tiziano De Matteis, Zebin Ren,
+Luigi Fusco, Matteo Turisini, Daniele Cesarini, Kurt Lust, Animesh Trivedi,
+Duncan Roweth, Filippo Spiga, Salvatore Di Girolamo, and Torsten Hoefler.
+2024. Exploring GPU-to-GPU Communication: Insights into Supercomputer
+Interconnects. In SC24: International Conference for High Performance Computing,
+Networking, Storage and Analysis. IEEE, 1–15. https://doi.org/10.1109/sc41406.
+2024.00039
+[23] Ewa Deelman, Rafael Ferreira da Silva, Gideon Juve, Mats Rynge, Karan Vahi,
+and Miron Livny. 2022. WfCommons: A Framework for Enabling Scientific
+Workflow Research and Development. Future Generation Computer Systems 129
+(2022), 166–182. https://doi.org/10.1016/j.future.2022.01.011
+[24] Wolfgang E. Denzel, Jian Li, Peter Walker, and Yuho Jin. 2010. A Framework
+for End-to-End Simulation of High-performance Computing Systems. SIM-
+ULATION 86, 5-6 (2010), 331–350. https://doi.org/10.1177/0037549709340840
+arXiv:https://doi.org/10.1177/0037549709340840
+[25] Jiangfei Duan, Xiuhong Li, Ping Xu, Xingcheng Zhang, Shengen Yan, Yun Liang,
+and Dahua Lin. 2024. Proteus: Simulating the Performance of Distributed DNN
+Training. IEEE Transactions on Parallel and Distributed Systems 35, 10 (2024),
+1867–1878. https://doi.org/10.1109/TPDS.2024.3443255
+[26] Jiangfei Duan, Shuo Zhang, Zerui Wang, Lijuan Jiang, Wenwen Qu, Qinghao
+Hu, Guoteng Wang, Qizhen Weng, Hang Yan, Xingcheng Zhang, Xipeng Qiu,
+Dahua Lin, Yonggang Wen, Xin Jin, Tianwei Zhang, and Peng Sun. 2024. Efficient
+Training of Large Language Models on Distributed Infrastructures: A Survey.
+arXiv:2407.20018 [cs.DC] https://arxiv.org/abs/2407.20018
+[27] Dror G. Feitelson. [n. d.]. The Parallel Workloads Archive. https://www.cs.huji.
+ac.il/labs/parallel/workload/. Accessed: 2025-04-12.
+[28] Yinxiao Feng, Yuchen Wei, Dong Xiang, and Kaisheng Ma. 2024. Evaluating
+Chiplet-based Large-Scale Interconnection Networks via Cycle-Accurate Packet-
+Parallel Simulation. In 2024 USENIX Annual Technical Conference (USENIX ATC
+24). USENIX Association, Santa Clara, CA, 731–747. https://www.usenix.org/
+conference/atc24/presentation/feng-yinxiao
+[29] Mackenzie Ferguson. 2025. Nvidia’s Unstoppable Rise: Dominating the AI Chip
+Market. OpenTools.ai (2025). https://opentools.ai/news/nvidias-unstoppable-
+rise-dominating-the-ai-chip-market Accessed: 2025-01-28.
+[30] Luigi Fusco, Mikhail Khalilov, Marcin Chrapek, Giridhar Chukkapalli, Thomas
+Schulthess, and Torsten Hoefler. 2024. Understanding Data Movement in Tightly
+Coupled Heterogeneous Systems: A Case Study with the Grace Hopper Superchip.
+arXiv:2408.11556 [cs.DC] https://arxiv.org/abs/2408.11556
+[31] Markus Geimer, Felix Wolf, Brian J. N. Wylie, Erika Ábrahám, Daniel Becker, and
+Bernd Mohr. 2010. The Scalasca performance toolset architecture. Concurrency
+and Computation: Practice and Experience 22 (4 2010), 702–719. Issue 6. https:
+//doi.org/10.1002/cpe.1556
+Shen et al.
+[32] Taylor Groves, Ben Brock, Yuxin Chen, Khaled Z. Ibrahim, Lenny Oliker,
+Nicholas J. Wright, Samuel Williams, and Katherine Yelick. 2020. Performance
+Trade-offs in GPU Communication: A Study of Host and Device-initiated Ap-
+proaches. In 2020 IEEE/ACM Performance Modeling, Benchmarking and Simulation
+of High Performance Computer Systems (PMBS). 126–137. https://doi.org/10.1109/
+PMBS51919.2020.00016
+[33] Juncheng Gu, Mosharaf Chowdhury, Kang G. Shin, Yibo Zhu, Myeongjae Jeon,
+Junjie Qian, Hongqiang Liu, and Chuanxiong Guo. 2019. Tiresias: A GPU Cluster
+Manager for Distributed Deep Learning. In16th USENIX Symposium on Networked
+Systems Design and Implementation (NSDI 19) . USENIX Association, Boston, MA,
+485–500. https://www.usenix.org/conference/nsdi19/presentation/gu
+[34] Mark Handley, Costin Raiciu, Alexandru Agache, Andrei Voinescu, Andrew W.
+Moore, Gianni Antichi, and Marcin Wójcik. 2017. Re-architecting datacenter
+networks and stacks for low latency and high performance. In Proceedings of
+the Conference of the ACM Special Interest Group on Data Communication (Los
+Angeles, CA, USA) (SIGCOMM ’17). Association for Computing Machinery, New
+York, NY, USA, 29–42. https://doi.org/10.1145/3098822.3098825
+[35] Thomas Henderson, Sally Floyd, and George Riley. 2006. ns3 Project Goals.
+Workshop on NS-2: the IP Network Simulator. (01 2006). https://doi.org/10.1145/
+1190455.1190468
+[36] Torsten Hoefler, Tommaso Bonato, Daniele De Sensi, Salvatore Di Girolamo,
+Shigang Li, Marco Heddes, Jon Belk, Deepak Goel, Miguel Castro, and Steve
+Scott. 2022. HammingMesh: A Network Topology for Large-Scale Deep Learning.
+arXiv:2209.01346 [cs.DC] https://arxiv.org/abs/2209.01346
+[37] Torsten Hoefler, Torsten Mehlan, Andrew Lumsdaine, and Wolfgang Rehm. 2007.
+Netgauge: A Network Performance Measurement Framework. In Proceedings of
+High Performance Computing and Communications, HPCC’07 (Houston, USA),
+Vol. 4782. Springer, 659–671.
+[38] Torsten Hoefler, Timo Schneider, and Andrew Lumsdaine. 2010. Character-
+izing the Influence of System Noise on Large-Scale Applications by Simula-
+tion. In SC ’10: Proceedings of the 2010 ACM/IEEE International Conference for
+High Performance Computing, Networking, Storage and Analysis . 1–11. https:
+//doi.org/10.1109/SC.2010.12
+[39] Torsten Hoefler, Timo Schneider, and Andrew Lumsdaine. 2010. LogGOPSim:
+simulating large-scale applications in the LogGOPS model. In Proceedings of the
+19th ACM International Symposium on High Performance Distributed Computing
+(Chicago, Illinois) (HPDC ’10). Association for Computing Machinery, New York,
+NY, USA, 597–604. https://doi.org/10.1145/1851476.1851564
+[40] Torsten Hoefler, Christian Siebert, and Andrew Lumsdaine. 2009. Group
+Operation Assembly Language - A Flexible Way to Express Collective Com-
+munication. In 2009 International Conference on Parallel Processing . 574–581.
+https://doi.org/10.1109/ICPP.2009.70
+[41] Intel Corporation. 2024. Intel® oneAPI Collective Communications Li-
+brary (oneCCL) . https://www.intel.com/content/www/us/en/docs/oneapi/
+programming-guide/2024-1/intel-oneapi-collective-communications-
+library.html Accessed: 2025-01-28.
+[42] Nikhil Jain, Abhinav Bhatele, Sam White, Todd Gamblin, and Laxmikant V. Kale.
+2016. Evaluating HPC Networks via Simulation of Parallel Workloads . In SC16:
+International Conference for High Performance Computing, Networking, Storage
+and Analysis (SC) . IEEE Computer Society, Los Alamitos, CA, USA, 154–165.
+https://doi.org/10.1109/SC.2016.13
+[43] Albert Q. Jiang, Alexandre Sablayrolles, Antoine Roux, Arthur Mensch, Blanche
+Savary, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Emma Bou
+Hanna, Florian Bressand, Gianna Lengyel, Guillaume Bour, Guillaume Lample,
+Lélio Renard Lavaud, Lucile Saulnier, Marie-Anne Lachaux, Pierre Stock, Sandeep
+Subramanian, Sophia Yang, Szymon Antoniak, Teven Le Scao, Théophile Gervet,
+Thibaut Lavril, Thomas Wang, Timothée Lacroix, and William El Sayed. 2024.
+Mixtral of Experts. arXiv:2401.04088 [cs.LG] https://arxiv.org/abs/2401.04088
+[44] Laxmikant V. Kale and Sanjeev Krishnan. 1993. CHARM++: a portable concurrent
+object oriented system based on C++. SIGPLAN Not. 28, 10 (oct 1993), 91–108.
+https://doi.org/10.1145/167962.165874
+[45] Ian Karlin, Abhinav Bhatele, Jeff Keasler, Bradford L. Chamberlain, Jonathan
+Cohen, Zachary Devito, Riyaz Haque, Dan Laney, Edward Luke, Felix Wang,
+David Richards, Martin Schulz, and Charles H. Still. 2013. Exploring Traditional
+and Emerging Parallel Programming Models Using a Proxy Application. In 2013
+IEEE 27th International Symposium on Parallel and Distributed Processing. 919–932.
+https://doi.org/10.1109/IPDPS.2013.115
+[46] Andreas Knüpfer, Ronny Brendel, Holger Brunst, Hartmut Mix, and Wolfgang E.
+Nagel. 2006. Introducing the open trace format (OTF). In Proceedings of the 6th
+International Conference on Computational Science - Volume Part II (Reading, UK)
+(ICCS’06). Springer-Verlag, Berlin, Heidelberg, 526–533. https://doi.org/10.1007/
+11758525_71
+[47] Andreas Knüpfer, Holger Brunst, Jens Doleschal, Matthias Jurenz, Matthias
+Lieber, Holger Mickler, Matthias S. Müller, and Wolfgang E. Nagel. 2008. The
+Vampir Performance Analysis Tool-Set. InTools for High Performance Computing,
+Michael Resch, Rainer Keller, Valentin Himmler, Bettina Krammer, and Alexander
+Schulz (Eds.). Springer Berlin Heidelberg, Berlin, Heidelberg, 139–155.
+[48] Andreas Knüpfer, Markus Geimer, Johannes Spazier, Joseph Schuchart, Michael
+Wagner, Dominic Eschweiler, and Matthias S. Müller. 2010. A generic attribute
+extension to OTF and its use for MPI replay. Procedia Computer Science 1, 1
+(2010), 2115–2124. https://doi.org/10.1016/j.procs.2010.04.237 ICCS 2010.
+[49] Andreas Knüpfer, Christian Rössel, Dieter an Mey, Scott Biersdorff, Kai Diethelm,
+Dominic Eschweiler, Markus Geimer, Michael Gerndt, Daniel Lorenz, Allen Mal-
+ony, Wolfgang E. Nagel, Yury Oleynik, Peter Philippen, Pavel Saviankou, Dirk
+Schmidl, Sameer Shende, Ronny Tschüter, Michael Wagner, Bert Wesarg, and
+Felix Wolf. 2012. Score-P: A Joint Performance Measurement Run-Time Infras-
+tructure for Periscope,Scalasca, TAU, and Vampir. InTools for High Performance
+Computing 2011 , Holger Brunst, Matthias S. Müller, Wolfgang E. Nagel, and
+Michael M. Resch (Eds.). Springer Berlin Heidelberg, Berlin, Heidelberg, 79–91.
+[50] Andreas Knüpfer, Ronny Brendel, Holger Brunst, Hartmut Mix, and Wolfgang E
+Nagel. 2006. LNCS 3992 - Introducing the Open Trace Format (OTF). https:
+//doi.org/doi:10.3233/978-1-61499-041-3-481
+[51] Greg Kramer. 2023. Direct Drive - Azure’s next-generation block storage ar-
+chitecture. https://storagedeveloper.org/events/agenda/session/347. [Online].
+Accessed: 2024-02-13.
+[52] Gautam Kumar, Nandita Dukkipati, Keon Jang, Hassan Wassel, Xian Wu, Behnam
+Montazeri, Yaogong Wang, Kevin Springborn, Christopher Alfeld, Mike Ryan,
+David J. Wetherall, and Amin Vahdat. 2020. Swift: Delay is Simple and Effective
+for Congestion Control in the Datacenter. https://dl.acm.org/doi/pdf/10.1145/
+3387514.3406591
+[53] Lawrence Livermore National Laboratory. [n. d.]. Lawrence Livermore Na-
+tional Laboratory’s El Capitan verified as world’s fastest supercomputer.
+LLNL ([n. d.]). https://www.llnl.gov/article/52061/lawrence-livermore-national-
+laboratorys-el-capitan-verified-worlds-fastest-supercomputer
+[54] Tian Li, Jie Zhong, Ji Liu, Wentao Wu, and Ce Zhang. 2018. Ease.ml: towards
+multi-tenant resource sharing for machine learning workloads. Proc. VLDB
+Endow. 11, 5 (Oct. 2018), 607–620. https://doi.org/10.1145/3177732.3177737
+[55] Yuliang Li, Rui Miao, Hongqiang Harry Liu, Yan Zhuang, Fei Feng, Lingbo Tang,
+Zheng Cao, Ming Zhang, Frank Kelly, Mohammad Alizadeh, and Minlan Yu.
+2019. HPCC: high precision congestion control. In Proceedings of the ACM
+Special Interest Group on Data Communication (Beijing, China) (SIGCOMM ’19).
+Association for Computing Machinery, New York, NY, USA, 44–58. https:
+//doi.org/10.1145/3341302.3342085
+[56] Ruofan Liang, Bingsheng He, Shengen Yan, and Peng Sun. 2022. A Simulation
+Platform for Multi-tenant Machine Learning Services on Thousands of GPUs.
+arXiv:2201.03175 [cs.DC] https://arxiv.org/abs/2201.03175
+[57] Linux Kernel Documentation. 2025. Extended Berkeley Packet Filter (eBPF).
+https://www.kernel.org/doc/html/latest/bpf/index.html. Accessed: February 04,
+2025. eBPF extends the classic BPF mechanism to run sandboxed programs in
+the Linux kernel for tracing, networking, and more..
+[58] Yuanwei Lu, Guo Chen, Bojie Li, Kun Tan, Yongqiang Xiong, Peng Cheng, Jian-
+song Zhang, Enhong Chen, and Thomas Moscibroda. 2018. Multi-Path Transport
+for RDMA in Datacenters. In 15th USENIX Symposium on Networked Systems
+Design and Implementation (NSDI 18). USENIX Association, Renton, WA, 357–371.
+https://www.usenix.org/conference/nsdi18/presentation/lu
+[59] Dorian Maillard. 2024. Nvidia’s AI market dominance: Can anyone mount a serious
+challenge? https://www.techradar.com/pro/nvidias-ai-market-dominance-can-
+anyone-mount-a-serious-challenge Accessed: 2025-01-28.
+[60] Misbah Mubarak, Christopher D. Carothers, Robert B. Ross, and Philip Carns.
+2017. Enabling Parallel Simulation of Large-Scale HPC Network Systems. IEEE
+Transactions on Parallel and Distributed Systems 28, 1 (2017), 87–100. https:
+//doi.org/10.1109/TPDS.2016.2543725
+[61] NVIDIA Corporation. 2025. NVIDIA Collective Communications Library (NCCL)
+Documentation. https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/
+index.html Accessed: 2025-01-28.
+[62] NVIDIA Corporation. 2025. NVIDIA Nsight Systems. https://developer.nvidia.
+com/nsight-systems
+[63] Vladimir Olteanu, Haggai Eran, Dragos Dumitrescu, Adrian Popa, Cristi Baciu,
+Mark Silberstein, Georgios Nikolaidis, Mark Handley, and Costin Raiciu. 2022.
+An edge-queued datagram service for all datacenter traffic. In 19th USENIX
+Symposium on Networked Systems Design and Implementation (NSDI 22) . USENIX
+Association, Renton, WA, 761–777. https://www.usenix.org/conference/nsdi22/
+presentation/olteanu
+[64] T. V. Pham, C. Steger, B. Rockel, K. Keuler, I. Kirchner, M. Mertens, D. Rieger, G.
+Zängl, and B. Früh. 2021. ICON in Climate Limited-area Mode (ICON release
+version 2.6.1): a new regional climate model. Geoscientific Model Development 14,
+2 (2021), 985–1005. https://doi.org/10.5194/gmd-14-985-2021
+[65] Costin Raiciu, Christopher Pluntke, Sebastien Barre, Adam Greenhalgh, Damon
+Wischik, and Mark Handley. 2010. Data Center Networking with Multipath TCP.
+In Proceedings of the 9th ACM SIGCOMM Workshop on Hot Topics in Networks
+(Monterey, California) (Hotnets-IX). Association for Computing Machinery, New
+York, NY, USA, Article 10, 6 pages. https://doi.org/10.1145/1868447.1868457
+[66] Saeed Rashidi, Joongun Park, Abhilash Kolluri, and Taekyung Heo. 2024. Chakra
+Execution Trace Collection – A Comprehensive Guide on Merging PyTorch and
+ATLAHS: An Application-centric Network Simulator T oolchain for A I, HPC, and Distributed S torage
+Kineto Traces. https://github.com/mlcommons/chakra/wiki/Chakra-Execution-
+Trace-Collection-%E2%80%90-A-Comprehensive-Guide-on-Merging-PyTorch-
+and-Kineto-Traces. GitHub wiki page, last edited on September 24, 2024.
+Accessed on March 26, 2025..
+[67] Thomas Rausch, Waldemar Hummer, and Vinod Muthusamy. 2020.
+PipeSim: Trace-driven Simulation of Large-Scale AI Operations Platforms.
+arXiv:2006.12587 [cs.DC] https://arxiv.org/abs/2006.12587
+[68] Charles Reiss, Alexey Tumanov, Gregory R. Ganger, Randy H. Katz, and
+Michael A. Kozuch. 2012. Heterogeneity and dynamicity of clouds at scale:
+Google trace analysis. In Proceedings of the Third ACM Symposium on Cloud
+Computing (SoCC). 7:1–7:13. https://doi.org/10.1145/2391229.2391236
+[69] George F Riley and Thomas R Henderson. 2010. The ns-3 network simulator. In
+Modeling and tools for network simulation . Springer, 15–34.
+[70] Alastair Robertson and contributors. 2025. bpftrace: A High-Level Tracing
+Language for Linux. https://github.com/iovisor/bpftrace Version 0.22.1; accessed
+February 04, 2025; licensed under Apache-2.0.
+[71] Hongzhang Shan, Filip Blagojević, Seung-Jai Min, Paul Hargrove, Haoqiang Jin,
+Karl Fuerlinger, Alice Koniges, and Nicholas J. Wright. 2010. A programming
+model performance study using the NAS parallel benchmarks. Sci. Program. 18,
+3–4 (Aug. 2010), 153–167. https://doi.org/10.1155/2010/715637
+[72] Siyuan Shen, Langwen Huang, Marcin Chrapek, Timo Schneider, Jai Dayal,
+Manisha Gajbe, Robert Wisniewski, and Torsten Hoefler. 2024. LLAMP: Assessing
+Network Latency Tolerance of HPC Applications with Linear Programming. In
+SC24: International Conference for High Performance Computing, Networking,
+Storage and Analysis. 1–18. https://doi.org/10.1109/SC41406.2024.00070
+[73] Sameer S. Shende and Allen D. Malony. 2006. The Tau Parallel Performance
+System. The International Journal of High Performance Computing Applications
+20 (5 2006), 287–311. Issue 2. https://doi.org/10.1177/1094342006064482
+[74] Srinivas Sridharan, Taekyung Heo, Louis Feng, Zhaodong Wang, Matt Bergeron,
+Wenyin Fu, Shengbao Zheng, Brian Coutinho, Saeed Rashidi, Changhai Man,
+and Tushar Krishna. 2023. Chakra: Advancing Performance Benchmarking
+and Co-design using Standardized Execution Traces. arXiv:2305.14516 [cs.LG]
+https://arxiv.org/abs/2305.14516
+[75] sstsimulator. 2025. SST-DUMPI Trace Library. https://github.com/sstsimulator/
+sst-dumpi. Accessed: 2025-02-14.
+[76] A. P. Thompson, H. M. Aktulga, R. Berger, D. S. Bolintineanu, W. M. Brown,
+P. S. Crozier, P. J. in ’t Veld, A. Kohlmeyer, S. G. Moore, T. D. Nguyen, R. Shan,
+M. J. Stevens, J. Tranchida, C. Trott, and S. J. Plimpton. 2022. LAMMPS - a
+flexible simulation tool for particle-based materials modeling at the atomic,
+meso, and continuum scales. Comp. Phys. Comm. 271 (2022), 108171. https:
+//doi.org/10.1016/j.cpc.2021.108171
+[77] Mustafa M. Tikir, Michael A. Laurenzano, Laura Carrington, and Allan Snavely.
+2009. PSINS: An Open Source Event Tracer and Execution Simulator. In2009 DoD
+High Performance Computing Modernization Program Users Group Conference .
+444–449. https://doi.org/10.1109/HPCMP-UGC.2009.73
+[78] Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne
+Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro,
+Faisal Azhar, Aurelien Rodriguez, Armand Joulin, Edouard Grave, and Guil-
+laume Lample. 2023. LLaMA: Open and Efficient Foundation Language Models.
+arXiv:2302.13971 [cs.CL] https://arxiv.org/abs/2302.13971
+[79] University of Massachusetts Amherst. 2016. UMass Trace Repository: Storage.
+https://traces.cs.umass.edu/docs/traces/storage/. Accessed: 4 February 2025.
+Copyright © 2016–2024 University of Massachusetts Amherst..
+[80] Erico Vanini, Rong Pan, Mohammad Alizadeh, Parvin Taheri, and Tom Edsall.
+2017. Let It Flow: Resilient Asymmetric Load Balancing with Flowlet Switching.
+In 14th USENIX Symposium on Networked Systems Design and Implementation
+(NSDI 17). USENIX Association, Boston, MA, 407–420. https://www.usenix.org/
+conference/nsdi17/technical-sessions/presentation/vanini
+[81] András Varga and Rudolf Hornig. 2008. An overview of the OMNeT++ simulation
+environment. In Proceedings of the 1st International Conference on Simulation
+Tools and Techniques for Communications, Networks and Systems & Workshops
+(Marseille, France) (Simutools ’08). ICST (Institute for Computer Sciences, Social-
+Informatics and Telecommunications Engineering), Brussels, BEL, Article 60,
+10 pages.
+[82] Kurt Wagner. [n. d.]. Meta Is Building New $800 Million AI-Focused Data Center
+in Indiana. Bloomberg ([n. d.]). https://www.bloomberg.com/news/articles/2024-
+01-25/meta-building-new-800-million-ai-focused-data-center-in-
+indiana?embedded-checkout=true
+[83] Xizheng Wang, Qingxu Li, Yichi Xu, Gang Lu, Dan Li, Chen Li, Heyang Zhou,
+Linkang Zheng, Sen Zhang, Yikai Zhu, Yang Liu, Pengcheng Zhang, Kun Qian,
+and Kunling He. 2025. SimAI: Unifying Architecture Design and Performance
+Tunning for Large-Scale Large Language Model Training with Scalability and
+Precision. In 22nd USENIX Symposium on Networked Systems Design and Imple-
+mentation (NSDI 25). USENIX Association.
+[84] William Won, Taekyung Heo, Saeed Rashidi, Srinivas Sridharan, Sudarshan
+Srinivasan, and Tushar Krishna. 2023. ASTRA-sim2.0: Modeling Hierarchi-
+cal Networks and Disaggregated Systems for Large-model Training at Scale.
+arXiv:2303.14006 [cs.DC] https://arxiv.org/abs/2303.14006
+[85] Feroz Zahid, Ernst Gunnar Gran, Bartosz Bogdański, Bjørn Dag Johnsen, and
+Tor Skeie. 2017. Efficient network isolation and load balancing in multi-tenant
+HPC clusters. Future Generation Computer Systems 72 (2017), 145–162. https:
+//doi.org/10.1016/j.future.2016.04.003
+[86] Ben Zaitlen. 2021. NVIDIA Tools Extension API: An Annotation Tool for Profil-
+ing Code in Python and C/C++. https://developer.nvidia.com/blog/nvidia-tools-
+extension-api-nvtx-annotation-tool-for-profiling-code-in-python-and-c-c/ Ac-
+cessed: 2025-01-28.
+[87] Jidong Zhai, Wenguang Chen, and Weimin Zheng. 2010. PHANTOM: predicting
+performance of parallel applications on large-scale parallel machines using a
+single node. In Proceedings of the 15th ACM SIGPLAN Symposium on Principles
+and Practice of Parallel Programming (Bangalore, India) (PPoPP ’10). Association
+for Computing Machinery, New York, NY, USA, 305–314. https://doi.org/10.
+1145/1693453.1693493
+[88] Tianqi Zhang, Yanqi Zhang, Yuandong Tian, Lin Ma, Wei Lin, and Bin Cui.
+2022. MLaaS in the Wild: Workload Analysis and Scheduling in Large-scale
+Heterogeneous GPU Clusters. In 19th USENIX Symposium on Networked Systems
+Design and Implementation (NSDI 22) . 827–841. https://github.com/alibaba/
+clusterdata/blob/master/cluster-trace-gpu-v2020/README.md
+[89] G. Zheng, Gunavardhan Kakulapati, and L.V. Kale. 2004. BigSim: a parallel simu-
+lator for performance prediction of extremely large parallel machines. In 18th
+International Parallel and Distributed Processing Symposium, 2004. Proceedings.
+78–. https://doi.org/10.1109/IPDPS.2004.1303013

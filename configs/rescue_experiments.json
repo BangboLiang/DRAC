@@ -1,0 +1,38 @@
+{
+  "name": "drac_rescue_experiments",
+  "seed": 7,
+  "seeds": [7, 19, 31],
+  "output_dir": "results/rescue_experiments",
+  "endpoint_count": 32,
+  "asymmetry_level": 4.0,
+  "hierarchy": {
+    "endpoints_per_server": 2,
+    "servers_per_tor": 2,
+    "tors_per_aggregation": 2
+  },
+  "aggregation_levels": ["endpoint", "server", "tor", "aggregation"],
+  "mapping_strategies": ["contiguous", "round_robin", "random"],
+  "collective_models": [
+    "original",
+    "bidirectional_balanced",
+    "pairwise_balancing_oracle"
+  ],
+  "algorithms": ["static_sym", "sym_ocs", "drac", "drac_gated"],
+  "port_budgets": [1, 2, 4, 6],
+  "omega_thresholds": [0.0, 0.05, 0.10, 0.20],
+  "bidirectional_chunks": 7,
+  "omega_epsilon": 1e-12,
+  "network": {
+    "base_bw_gbps": 25.0,
+    "ocs_unit_bw_gbps": 100.0,
+    "per_node_port_budget": 4,
+    "total_ocs_links": 32,
+    "reconfig_delay_ms": 20.0
+  },
+  "workloads": [
+    {"name": "tp", "kind": "tp", "segment_count": 3, "scale": 1.0, "tp_group_size": 8},
+    {"name": "dp", "kind": "dp", "segment_count": 3, "scale": 1.8, "dp_group_size": 8},
+    {"name": "mixed", "kind": "mixed", "segment_count": 3, "scale": 1.4, "mixed_weights": {"tp": 0.4, "dp": 0.6}},
+    {"name": "pp", "kind": "pp", "segment_count": 3, "scale": 0.9}
+  ]
+}
