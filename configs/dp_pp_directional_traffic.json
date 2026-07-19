@@ -1,0 +1,67 @@
+{
+  "derivation_version": "preview-v2",
+  "status": "PROVISIONAL_MISSING_RAW_MEASUREMENT",
+  "assumption_versions": {
+    "dp": "dp-zero2-rs-ag-v1",
+    "pp": "pp-independent-tensors-v2-repo-model"
+  },
+  "model": {
+    "name": "LLaMA-3 405B 8K CP=1",
+    "layers": 126,
+    "hidden_size": 16384,
+    "sequence_length": 8192,
+    "head_dim": 128,
+    "kv_dim": 1024,
+    "ffn_hidden": 53248,
+    "parameter_count": 405000000000,
+    "activation_bytes": 2,
+    "parameter_bytes": 2,
+    "gradient_bytes": 4
+  },
+  "parallelism": {
+    "tp_group_size": 8,
+    "pipeline_stage_count": 16,
+    "dp_group_size": 128,
+    "global_batch_sequences": 2048,
+    "microbatch_sequences": 1,
+    "microbatch_count": 16,
+    "representative_pipeline_stage_index": 0
+  },
+  "schedule": {
+    "dp_collective": "Ring Reduce-Scatter (FP32 gradients) + Ring All-Gather (BF16 parameters)",
+    "dp_ring_ordered_pair": ["dp_rank_0", "dp_rank_1"],
+    "pp_schedule": "full-iteration boundary-transfer count; valid for all-forward/all-backward or non-interleaved 1F1B ordering",
+    "pp_ordered_pair": ["pipeline_stage_0", "pipeline_stage_1"]
+  },
+  "pp_tensors": {
+    "forward": {
+      "name": "TP-sharded boundary activation",
+      "shape": "[sequence_length / tp_group_size, hidden_size]",
+      "element_bytes": 2,
+      "precision": "BF16",
+      "source": "llama3_comm/traffic.py:llama3_megatron_payloads"
+    },
+    "backward": {
+      "name": "TP-sharded boundary activation gradient",
+      "shape": "[sequence_length / tp_group_size, hidden_size]",
+      "element_bytes": 2,
+      "precision": "2-byte activation-gradient elements in repository workload model",
+      "source": "modeling.md backward PP grad=32MiB; llama3_modular.py BWD PP payload"
+    }
+  },
+  "legacy_measurement": {
+    "source_measurement_file": "figures/plot-drop-rx-tx-v2.py",
+    "source_status": "embedded aggregate only; raw measurement file and collection metadata unavailable",
+    "repetitions": 100,
+    "payload_direction": {
+      "payload_bytes": 79069184000,
+      "rocev2_overhead_bytes": 5015313872,
+      "phy_overhead_bytes": 325501306
+    },
+    "reverse_direction": {
+      "cts_bytes": 4832000,
+      "other_rocev2_control_bytes": 593685400,
+      "unclassified_control_bytes": 8766
+    }
+  }
+}
