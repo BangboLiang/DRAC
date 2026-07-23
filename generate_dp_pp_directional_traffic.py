@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-<<<<<<< HEAD
-from __future__ import annotations
-
-import argparse
-import json
-
-from drac_eval.directional_traffic import write_directional_traffic_csvs
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate canonical DP/PP directional-traffic CSVs.")
-    parser.add_argument("--output-dir", default="results/dp_pp_directional_traffic")
-    args = parser.parse_args()
-    outputs = write_directional_traffic_csvs(args.output_dir)
-    print(json.dumps({key: str(path) for key, path in outputs.items()}, indent=2))
-=======
 """Generate provisional, auditable DP/PP directional-traffic CSV files."""
 
 from __future__ import annotations
@@ -58,7 +42,6 @@ def main() -> None:
             f"{row['workload']}: main={float(row['main_direction_bytes']):.6f} bytes, "
             f"opposite={float(row['opposite_direction_bytes']):.6f} bytes"
         )
->>>>>>> 6839052da73682436a4eeed00ae6ac55603f3e49
 
 
 if __name__ == "__main__":

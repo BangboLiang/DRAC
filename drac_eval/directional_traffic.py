@@ -1,26 +1,17 @@
-<<<<<<< HEAD
-"""Canonical directional-traffic data used by small paper examples.
-
-The raw counters below are the physical per-port byte counters already used by
-``figures/rx_tx_port_traffic_total_only_8layer_sqrt.py``.  Keeping them here
-lets data-generation and plotting code share one source instead of embedding
-another LLaMA communication model.
-
-Functions in this module were introduced by
-``generate_dp_pp_directional_traffic.py``.
-=======
 """Auditable DP/PP ordered-direction traffic derivation.
 
 This module supports ``generate_dp_pp_directional_traffic.py``.  It deliberately
 keeps workload-byte derivation separate from plotting and labels legacy embedded
 counter ratios as provisional when their raw measurement artifact is unavailable.
->>>>>>> 6839052da73682436a4eeed00ae6ac55603f3e49
+
+The compatibility helpers ``write_directional_traffic_csvs`` and
+``load_dp_directional_demand`` are retained for older scripts.  They expose the
+same legacy embedded counters but do not promote them to measured evidence.
 """
 
 from __future__ import annotations
 
 import csv
-<<<<<<< HEAD
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -111,12 +102,10 @@ def load_dp_directional_demand(path: str | Path) -> tuple[float, float]:
     if main_bytes <= 0 or opposite_bytes <= 0:
         raise ValueError("both DP ordered directions must have positive demand")
     return main_bytes / 1e9, opposite_bytes / 1e9
-=======
 import json
 import math
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from llama3_comm.config import ModelConfig, ParallelConfig
 from llama3_comm.traffic import llama3_megatron_payloads
@@ -499,4 +488,3 @@ def write_csv(path: str | Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=keys)
         writer.writeheader()
         writer.writerows(rows)
->>>>>>> 6839052da73682436a4eeed00ae6ac55603f3e49

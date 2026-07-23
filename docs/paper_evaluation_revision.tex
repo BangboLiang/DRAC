@@ -1,0 +1,136 @@
+% Source-ready Evaluation replacement for the current paper source project.
+% The main LaTeX source is absent from this repository; see paper_update_blocker.md.
+% All numerical claims below come from results/evaluation_v1/processed CSV files.
+
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Methodology}
+We evaluate Static-Sym, Sym-OCS, and DRAC on ordered DP, PP, and DP+PP
+communication graphs.  Sym-OCS receives the same endpoint channel budget,
+ordered node sequence, and reconfiguration-delay model as DRAC, but enforces
+$X_{uv}=X_{vu}$.  Unless otherwise stated, the deterministic simulator uses a
+25-Gb/s fixed path, 100 Gb/s per OCS connection unit, seed 7, a 0.5-ms
+reconfiguration delay, and realization tolerance $\epsilon=0.1$.  Simulator
+outputs are not hardware measurements.
+
+\subsection{Accuracy of Ordered-Demand Profiling}
+\label{sec:eval-profiler}
+\textbf{Measurement TODO.} The artifact does not contain raw directional NIC
+counters.  Figure~\ref{fig:profiler-accuracy} therefore reports the missing-input
+state and does not present simulated traffic as measured traffic.  Once the raw
+counters are supplied, the checked-in loader evaluates payload-only and
+payload-plus-calibration predictions using weighted absolute, median, P95,
+main-direction, reverse/control-direction, and dominant-direction errors.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{results/evaluation_v1/figures/figure_6_profiler_accuracy.pdf}
+  \caption{Ordered-demand profiler validation status.  Measured directional NIC
+  counters are not present in this artifact; no simulated value is labeled as a
+  measurement.}
+  \label{fig:profiler-accuracy}
+\end{figure}
+
+\subsection{End-to-End Communication Performance}
+\label{sec:eval-e2e}
+Figure~\ref{fig:e2e} reports communication and reconfiguration time from the
+revised simulator.  At eight channels per endpoint, DRAC reduces the DP time
+from 2.842 ms for Sym-OCS to 1.464 ms.  The PP and mixed cases are negative
+results: DRAC takes 7.452 ms and 8.585 ms, versus 5.952 ms and 6.632 ms for
+Sym-OCS, because the selected schedules pay more reconfiguration overhead.
+These results motivate further PP scheduling work and prevent an unsupported
+no-harm claim.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{results/evaluation_v1/figures/figure_7_end_to_end_performance.pdf}
+  \caption{End-to-end communication time for DP, PP, and DP+PP ordered
+  communication graphs.  All three schemes use the same graph, resource budget,
+  and delay model.}
+  \label{fig:e2e}
+\end{figure*}
+
+\subsection{Directional Target Generation and Segmentation}
+\label{sec:eval-segmentation}
+The validation compares the closed-form per-node target against a numerical
+reference and exhaustive small instances.  Figure~\ref{fig:segmentation} shows
+the segmentation trade-off.  At low delay the DP solution retains four
+representative configurations for this trace; at 10 ms it collapses to one
+configuration, matching the expected OneConfig limit.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{results/evaluation_v1/figures/figure_8_segmentation.pdf}
+  \caption{Segmentation total cost and selected segment count as the
+  reconfiguration delay $\delta$ changes.}
+  \label{fig:segmentation}
+\end{figure*}
+
+\subsection{Sparse Integer OCS Realization}
+\label{sec:eval-realization}
+Figure~\ref{fig:realization} compares FloorOnly, NearestRounding,
+FillAllResidual, DRACSparse, and a small exhaustive oracle.  DRACSparse stops
+when the slowdown tolerance is met and then reverse-prunes; it does not consume
+all remaining ports merely to reduce target residual.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{results/evaluation_v1/figures/figure_9_realization_tradeoff.pdf}
+  \caption{Realized slowdown and schedule-wide stable channels versus
+  realization tolerance $\epsilon$.}
+  \label{fig:realization}
+\end{figure*}
+
+\subsection{Schedule-Wide Resource Compaction}
+\label{sec:eval-compaction}
+The planner reserves the maximum outgoing and incoming degree over the complete
+schedule, rather than exposing ports that happen to be idle in one segment.
+For the evaluated eight-channel configurations, the schedule-wide peak reserves
+48 of 64 directional channels and stably exposes 16.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{results/evaluation_v1/figures/figure_10_schedule_compaction.pdf}
+  \caption{Schedule-wide stable reserved and exposed directional channels.}
+  \label{fig:compaction}
+\end{figure*}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{results/evaluation_v1/figures/figure_11_iso_performance_pool.pdf}
+  \caption{Minimum stable channel pool at the communication time of the
+  four-channel Sym-OCS reference.  Independent Tx/Rx and bidirectional-bundle
+  accounting are shown separately.}
+  \label{fig:iso-pool}
+\end{figure}
+
+\subsection{Sensitivity and Offline Planning Overhead}
+\label{sec:eval-overhead}
+The artifact records graph parsing, ordered profiling, per-node target
+generation, service-matrix construction, candidate segment costs, dynamic
+programming, sparse realization, and schedule compaction separately.  Runtime
+values are machine-dependent and are regenerated into
+Table~\ref{tab:target-runtime}; no runtime is manually embedded here.
+
+\begin{table}[t]
+  \centering
+  \caption{Target solver correctness and offline planning runtime.}
+  \label{tab:target-runtime}
+  \input{results/evaluation_v1/tables/target_solver_validation.tex}
+\end{table}
+
+\subsection{Summary}
+The revised evaluation validates node-level target optimality, target-sequence
+segmentation, tolerance-driven sparse realization, and schedule-wide resource
+compaction.  It also identifies two limits of the current artifact: measured
+profiler counters are missing, and PP-heavy schedules do not yet satisfy the
+desired no-harm behavior.  We therefore do not reuse the legacy skew-threshold,
+share-error, residual-gap, or headline speedup results.
+
+% Abstract/Introduction/Conclusion integration note:
+% Do not copy legacy headline numbers. State that profiling measurement is
+% pending and that the current deterministic simulator demonstrates a DP benefit
+% but exposes unresolved PP/mixed reconfiguration overhead. Integrate only after
+% the complete paper source is restored and cross-references can be compiled.
+

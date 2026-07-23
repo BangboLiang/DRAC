@@ -1,0 +1,857 @@
+{
+  "archived_v1_baseline_ms": {
+    "DP": {
+      "DRAC-v1": 1.464,
+      "Sym-OCS": 2.842
+    },
+    "DP+PP Mixed": {
+      "DRAC-v1": 8.585,
+      "Sym-OCS": 6.632
+    },
+    "PP": {
+      "DRAC-v1": 7.452,
+      "Sym-OCS": 5.952
+    }
+  },
+  "connections_per_epsilon": {
+    "DP": {
+      "0.0": {
+        "connections": 12,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.0,
+        "stable_channels": 24,
+        "swaps": 0
+      },
+      "0.05": {
+        "connections": 12,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.0,
+        "stable_channels": 24,
+        "swaps": 0
+      },
+      "0.1": {
+        "connections": 12,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.0,
+        "stable_channels": 24,
+        "swaps": 0
+      },
+      "0.2": {
+        "connections": 12,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.0,
+        "stable_channels": 24,
+        "swaps": 0
+      },
+      "0.35": {
+        "connections": 9,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.3076923076923077,
+        "stable_channels": 18,
+        "swaps": 0
+      },
+      "0.5": {
+        "connections": 9,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.3076923076923077,
+        "stable_channels": 18,
+        "swaps": 0
+      },
+      "0.75": {
+        "connections": 9,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.3076923076923077,
+        "stable_channels": 18,
+        "swaps": 0
+      },
+      "1.0": {
+        "connections": 6,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 6,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.8888888888888888,
+        "stable_channels": 12,
+        "swaps": 0
+      },
+      "1.5": {
+        "connections": 6,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 6,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.8888888888888888,
+        "stable_channels": 12,
+        "swaps": 0
+      },
+      "2.0": {
+        "connections": 6,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 6,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.8888888888888888,
+        "stable_channels": 12,
+        "swaps": 0
+      }
+    },
+    "DP+PP Mixed": {
+      "0.0": {
+        "connections": 10,
+        "feasible": false,
+        "oracle_unit_gap": null,
+        "pruned": 0,
+        "resource_constrained": true,
+        "seed": "FloorSeed",
+        "slowdown": 1.0717967697244903,
+        "stable_channels": 20,
+        "swaps": 0
+      },
+      "0.05": {
+        "connections": 11,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.0388184075791214,
+        "stable_channels": 22,
+        "swaps": 0
+      },
+      "0.1": {
+        "connections": 10,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FloorSeed",
+        "slowdown": 1.0717967697244903,
+        "stable_channels": 20,
+        "swaps": 0
+      },
+      "0.2": {
+        "connections": 9,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FloorSeed",
+        "slowdown": 1.1789764466969395,
+        "stable_channels": 18,
+        "swaps": 1
+      },
+      "0.35": {
+        "connections": 8,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.2861561236693886,
+        "stable_channels": 16,
+        "swaps": 0
+      },
+      "0.5": {
+        "connections": 8,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.2861561236693886,
+        "stable_channels": 16,
+        "swaps": 0
+      },
+      "0.75": {
+        "connections": 7,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 4,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.7148748315591846,
+        "stable_channels": 14,
+        "swaps": 1
+      },
+      "1.0": {
+        "connections": 5,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 6,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.9292341855040829,
+        "stable_channels": 10,
+        "swaps": 0
+      },
+      "1.5": {
+        "connections": 5,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 6,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.9292341855040829,
+        "stable_channels": 10,
+        "swaps": 0
+      },
+      "2.0": {
+        "connections": 4,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 7,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 2.893851278256124,
+        "stable_channels": 8,
+        "swaps": 0
+      }
+    },
+    "PP": {
+      "0.0": {
+        "connections": 8,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 0.9999999999999998,
+        "stable_channels": 16,
+        "swaps": 0
+      },
+      "0.05": {
+        "connections": 8,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 0.9999999999999998,
+        "stable_channels": 16,
+        "swaps": 0
+      },
+      "0.1": {
+        "connections": 8,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 0.9999999999999998,
+        "stable_channels": 16,
+        "swaps": 0
+      },
+      "0.2": {
+        "connections": 7,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 1,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.1999999999999997,
+        "stable_channels": 14,
+        "swaps": 0
+      },
+      "0.35": {
+        "connections": 7,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 1,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.323076923076923,
+        "stable_channels": 14,
+        "swaps": 2
+      },
+      "0.5": {
+        "connections": 6,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 2,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.4,
+        "stable_channels": 12,
+        "swaps": 0
+      },
+      "0.75": {
+        "connections": 5,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.5999999999999999,
+        "stable_channels": 10,
+        "swaps": 0
+      },
+      "1.0": {
+        "connections": 4,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 4,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.7999999999999998,
+        "stable_channels": 8,
+        "swaps": 0
+      },
+      "1.5": {
+        "connections": 4,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 4,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.7999999999999998,
+        "stable_channels": 8,
+        "swaps": 0
+      },
+      "2.0": {
+        "connections": 4,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 4,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.7999999999999998,
+        "stable_channels": 8,
+        "swaps": 0
+      }
+    },
+    "Synthetic Hard": {
+      "0.0": {
+        "connections": 7,
+        "feasible": false,
+        "oracle_unit_gap": null,
+        "pruned": 0,
+        "resource_constrained": true,
+        "seed": "FloorSeed",
+        "slowdown": 1.0927872362319588,
+        "stable_channels": 14,
+        "swaps": 0
+      },
+      "0.05": {
+        "connections": 8,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.0496222956703667,
+        "stable_channels": 16,
+        "swaps": 0
+      },
+      "0.1": {
+        "connections": 7,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 0,
+        "resource_constrained": false,
+        "seed": "FloorSeed",
+        "slowdown": 1.0927872362319588,
+        "stable_channels": 14,
+        "swaps": 0
+      },
+      "0.2": {
+        "connections": 7,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 1,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.1614163863334828,
+        "stable_channels": 14,
+        "swaps": 0
+      },
+      "0.35": {
+        "connections": 6,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 2,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.3039538519289557,
+        "stable_channels": 12,
+        "swaps": 0
+      },
+      "0.5": {
+        "connections": 5,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.3725830020304797,
+        "stable_channels": 10,
+        "swaps": 0
+      },
+      "0.75": {
+        "connections": 5,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 3,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.3725830020304797,
+        "stable_channels": 10,
+        "swaps": 0
+      },
+      "1.0": {
+        "connections": 4,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 4,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 1.9216162028426718,
+        "stable_channels": 8,
+        "swaps": 0
+      },
+      "1.5": {
+        "connections": 3,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 5,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 2.4706494036548636,
+        "stable_channels": 6,
+        "swaps": 0
+      },
+      "2.0": {
+        "connections": 3,
+        "feasible": true,
+        "oracle_unit_gap": 0.0,
+        "pruned": 5,
+        "resource_constrained": false,
+        "seed": "FillResidualSeed",
+        "slowdown": 2.4706494036548636,
+        "stable_channels": 6,
+        "swaps": 0
+      }
+    }
+  },
+  "end_to_end_port_budget": 8,
+  "end_to_end_times": {
+    "DP": {
+      "DRAC-SegmentOpt": {
+        "communication_only_ms": 1.9327352832,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 1.9327352832
+      },
+      "DRAC-SegmentOpt+Fallback": {
+        "communication_only_ms": 1.9327352832,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 1.9327352832
+      },
+      "DRAC-v1": {
+        "communication_only_ms": 1.9327352832,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 1.9327352832
+      },
+      "Static-Sym": {
+        "communication_only_ms": 3.7167986215384614,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 3.7167986215384614
+      },
+      "Sym-OCS": {
+        "communication_only_ms": 3.7167986215384614,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 3.7167986215384614
+      }
+    },
+    "DP+PP Mixed": {
+      "DRAC-SegmentOpt": {
+        "communication_only_ms": 7.345973493854141,
+        "reconfiguration_ms": 0.5,
+        "total_ms": 7.845973493854141
+      },
+      "DRAC-SegmentOpt+Fallback": {
+        "communication_only_ms": 7.345973493854141,
+        "reconfiguration_ms": 0.5,
+        "total_ms": 7.845973493854141
+      },
+      "DRAC-v1": {
+        "communication_only_ms": 4.8164990390857145,
+        "reconfiguration_ms": 5.0,
+        "total_ms": 9.816499039085715
+      },
+      "Static-Sym": {
+        "communication_only_ms": 10.669938235977877,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 10.669938235977877
+      },
+      "Sym-OCS": {
+        "communication_only_ms": 9.935755792217195,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 9.935755792217195
+      }
+    },
+    "PP": {
+      "DRAC-SegmentOpt": {
+        "communication_only_ms": 2.904215981104762,
+        "reconfiguration_ms": 1.5,
+        "total_ms": 4.4042159811047625
+      },
+      "DRAC-SegmentOpt+Fallback": {
+        "communication_only_ms": 2.904215981104762,
+        "reconfiguration_ms": 1.5,
+        "total_ms": 4.4042159811047625
+      },
+      "DRAC-v1": {
+        "communication_only_ms": 2.5769803776,
+        "reconfiguration_ms": 5.5,
+        "total_ms": 8.0769803776
+      },
+      "Static-Sym": {
+        "communication_only_ms": 5.301229115977878,
+        "reconfiguration_ms": 0.0,
+        "total_ms": 5.301229115977878
+      },
+      "Sym-OCS": {
+        "communication_only_ms": 2.5769803776,
+        "reconfiguration_ms": 4.0,
+        "total_ms": 6.5769803776
+      }
+    }
+  },
+  "evidence": "DETERMINISTIC_SIMULATOR_INPUT",
+  "fallback_usage": {
+    "DP": {
+      "DRAC-SegmentOpt": {
+        "fraction": 0.0,
+        "selected_from": "directional",
+        "symmetric_segments": 0
+      },
+      "DRAC-SegmentOpt+Fallback": {
+        "fraction": 0.0,
+        "selected_from": "schedule-level fallback selected directional",
+        "symmetric_segments": 0
+      }
+    },
+    "DP+PP Mixed": {
+      "DRAC-SegmentOpt": {
+        "fraction": 0.0,
+        "selected_from": "directional",
+        "symmetric_segments": 0
+      },
+      "DRAC-SegmentOpt+Fallback": {
+        "fraction": 0.0,
+        "selected_from": "schedule-level fallback selected directional",
+        "symmetric_segments": 0
+      }
+    },
+    "PP": {
+      "DRAC-SegmentOpt": {
+        "fraction": 0.0,
+        "selected_from": "directional",
+        "symmetric_segments": 0
+      },
+      "DRAC-SegmentOpt+Fallback": {
+        "fraction": 0.0,
+        "selected_from": "schedule-level fallback selected directional",
+        "symmetric_segments": 0
+      }
+    }
+  },
+  "iso_performance_pools": {
+    "DP": {
+      "minimum_port_budget": 2,
+      "minimum_stable_bundle_pool": 8,
+      "minimum_stable_directional_pool": 16,
+      "reference_ports": 4,
+      "reference_total_ms": 5.36870912,
+      "status": "reached"
+    },
+    "DP+PP Mixed": {
+      "minimum_port_budget": 2,
+      "minimum_stable_bundle_pool": 8,
+      "minimum_stable_directional_pool": 16,
+      "reference_ports": 4,
+      "reference_total_ms": 18.730829596444444,
+      "status": "reached"
+    },
+    "PP": {
+      "minimum_port_budget": 3,
+      "minimum_stable_bundle_pool": 8,
+      "minimum_stable_directional_pool": 16,
+      "reference_ports": 4,
+      "reference_total_ms": 8.955731495384615,
+      "status": "reached"
+    }
+  },
+  "measurement_status": "NIC_DIRECTIONAL_COUNTERS_UNAVAILABLE",
+  "oracle_gaps": {
+    "realization_max_unit_gap": {
+      "DP": 0.0,
+      "DP+PP Mixed": 0.0,
+      "PP": 0.0,
+      "Synthetic Hard": 0.0
+    },
+    "segmentation_max_relative_gap": {
+      "DP": 1.5999970770955313e-11,
+      "DP+PP Mixed": 1.409515763812911e-11,
+      "PP": 1.60000856571515e-11
+    }
+  },
+  "planner_runtimes": {
+    "16": {
+      "candidate_segment_target_ms": 4767.869499977678,
+      "dynamic_programming_ms": 0.3255000337958336,
+      "schedule_compaction_ms": 0.11349981650710106,
+      "sparse_realization_ms": 142.90300011634827,
+      "total_planning_ms": 4911.211499944329
+    },
+    "32": {
+      "candidate_segment_target_ms": 39960.81810002215,
+      "dynamic_programming_ms": 1.195400021970272,
+      "schedule_compaction_ms": 0.11539994738996029,
+      "sparse_realization_ms": 272.2662999294698,
+      "total_planning_ms": 40234.39519992098
+    },
+    "4": {
+      "candidate_segment_target_ms": 154.04949989169836,
+      "dynamic_programming_ms": 0.05759997293353081,
+      "schedule_compaction_ms": 0.14750007539987564,
+      "sparse_realization_ms": 22.415800020098686,
+      "total_planning_ms": 176.67039996013045
+    },
+    "64": {
+      "candidate_segment_target_ms": 302177.40689986385,
+      "dynamic_programming_ms": 4.674799973145127,
+      "schedule_compaction_ms": 0.1574999187141657,
+      "sparse_realization_ms": 640.6326000578701,
+      "total_planning_ms": 302822.8717998136
+    },
+    "8": {
+      "candidate_segment_target_ms": 747.2764002159238,
+      "dynamic_programming_ms": 0.11259992606937885,
+      "schedule_compaction_ms": 0.11719996109604836,
+      "sparse_realization_ms": 82.6210998930037,
+      "total_planning_ms": 830.1272999960929
+    }
+  },
+  "schema_version": "drac_algorithm_revision_v2/1",
+  "segment_counts": {
+    "DP": {
+      "DRAC-SegmentOpt": 1,
+      "DRAC-SegmentOpt+Fallback": 1,
+      "DRAC-v1": 1,
+      "Static-Sym": 1,
+      "Sym-OCS": 1
+    },
+    "DP+PP Mixed": {
+      "DRAC-SegmentOpt": 2,
+      "DRAC-SegmentOpt+Fallback": 2,
+      "DRAC-v1": 11,
+      "Static-Sym": 1,
+      "Sym-OCS": 1
+    },
+    "PP": {
+      "DRAC-SegmentOpt": 4,
+      "DRAC-SegmentOpt+Fallback": 4,
+      "DRAC-v1": 12,
+      "Static-Sym": 1,
+      "Sym-OCS": 9
+    }
+  },
+  "speedups_vs_sym_ocs": {
+    "DP": {
+      "DRAC-SegmentOpt": 1.9230769230769231,
+      "DRAC-SegmentOpt+Fallback": 1.9230769230769231,
+      "DRAC-v1": 1.9230769230769231,
+      "Static-Sym": 1.0,
+      "Sym-OCS": 1.0
+    },
+    "DP+PP Mixed": {
+      "DRAC-SegmentOpt": 1.2663509250955296,
+      "DRAC-SegmentOpt+Fallback": 1.2663509250955296,
+      "DRAC-v1": 1.0121486033520346,
+      "Static-Sym": 0.9311915001264863,
+      "Sym-OCS": 1.0
+    },
+    "PP": {
+      "DRAC-SegmentOpt": 1.493337385318287,
+      "DRAC-SegmentOpt+Fallback": 1.493337385318287,
+      "DRAC-v1": 0.814287031802136,
+      "Static-Sym": 1.2406519759308297,
+      "Sym-OCS": 1.0
+    }
+  },
+  "stable_pools": {
+    "DP": {
+      "DRAC-SegmentOpt": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      },
+      "DRAC-Sparse": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      },
+      "DRAC-v1": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      },
+      "FullReservation": {
+        "bundle_pool": 32,
+        "compaction_ratio": 0.0,
+        "exposed_rx": 0,
+        "exposed_tx": 0,
+        "reserved_rx": 32,
+        "reserved_tx": 32,
+        "total_pool": 64
+      },
+      "Sym-OCS": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      }
+    },
+    "DP+PP Mixed": {
+      "DRAC-SegmentOpt": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.265625,
+        "exposed_rx": 9,
+        "exposed_tx": 8,
+        "reserved_rx": 23,
+        "reserved_tx": 24,
+        "total_pool": 47
+      },
+      "DRAC-Sparse": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.265625,
+        "exposed_rx": 9,
+        "exposed_tx": 8,
+        "reserved_rx": 23,
+        "reserved_tx": 24,
+        "total_pool": 47
+      },
+      "DRAC-v1": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      },
+      "FullReservation": {
+        "bundle_pool": 32,
+        "compaction_ratio": 0.0,
+        "exposed_rx": 0,
+        "exposed_tx": 0,
+        "reserved_rx": 32,
+        "reserved_tx": 32,
+        "total_pool": 64
+      },
+      "Sym-OCS": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      }
+    },
+    "PP": {
+      "DRAC-SegmentOpt": {
+        "bundle_pool": 22,
+        "compaction_ratio": 0.3125,
+        "exposed_rx": 10,
+        "exposed_tx": 10,
+        "reserved_rx": 22,
+        "reserved_tx": 22,
+        "total_pool": 44
+      },
+      "DRAC-Sparse": {
+        "bundle_pool": 22,
+        "compaction_ratio": 0.3125,
+        "exposed_rx": 10,
+        "exposed_tx": 10,
+        "reserved_rx": 22,
+        "reserved_tx": 22,
+        "total_pool": 44
+      },
+      "DRAC-v1": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      },
+      "FullReservation": {
+        "bundle_pool": 32,
+        "compaction_ratio": 0.0,
+        "exposed_rx": 0,
+        "exposed_tx": 0,
+        "reserved_rx": 32,
+        "reserved_tx": 32,
+        "total_pool": 64
+      },
+      "Sym-OCS": {
+        "bundle_pool": 24,
+        "compaction_ratio": 0.25,
+        "exposed_rx": 8,
+        "exposed_tx": 8,
+        "reserved_rx": 24,
+        "reserved_tx": 24,
+        "total_pool": 48
+      }
+    }
+  },
+  "test_status": "112 passed in 72.31s"
+}

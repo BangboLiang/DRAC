@@ -1,0 +1,13 @@
+{
+  "experiment": "realization",
+  "seed": 7,
+  "output_dir": "results/evaluation_v1",
+  "workload": "dp",
+  "endpoint_count": 3,
+  "message_bytes": 33554432,
+  "port_budget": 4,
+  "base_bandwidth_gbps": 25,
+  "unit_bandwidth_gbps": 100,
+  "delta_ms": 0.5,
+  "epsilon_values": [0, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0]
+}

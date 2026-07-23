@@ -1,0 +1,13 @@
+{
+  "experiment": "segmentation",
+  "seed": 7,
+  "output_dir": "results/evaluation_smoke",
+  "workload": "mixed",
+  "endpoint_count": 3,
+  "message_bytes": 4194304,
+  "repeats": 1,
+  "port_budget": 3,
+  "base_bandwidth_gbps": 25,
+  "unit_bandwidth_gbps": 100,
+  "delta_values_ms": [0, 1]
+}

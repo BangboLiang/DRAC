@@ -1,0 +1,11 @@
+{
+  "experiment": "realization_v2",
+  "seed": 7,
+  "output_dir": "results/evaluation_v2_smoke",
+  "endpoint_count": 3,
+  "message_bytes": 8388608,
+  "port_budget": 4,
+  "base_bandwidth_gbps": 25,
+  "unit_bandwidth_gbps": 100,
+  "epsilon_values": [0, 0.5, 1, 2]
+}
