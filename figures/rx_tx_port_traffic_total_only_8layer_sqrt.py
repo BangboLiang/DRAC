@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
+from drac_eval.directional_traffic import RAW_PHYSICAL_COUNTERS
+
 plt.rcParams.update({
     "font.size": 15,
     "axes.titlesize": 19,
@@ -16,10 +18,10 @@ groups = [
     "Data Parallelism",
 ]
 
-physical_rx = [361_013_422, 598_526_166]
-physical_tx = [50_154_823_250, 84_409_999_178]
+physical_rx = [RAW_PHYSICAL_COUNTERS[key]["opposite_direction_bytes_raw"] for key in ("TP", "DP")]
+physical_tx = [RAW_PHYSICAL_COUNTERS[key]["main_direction_bytes_raw"] for key in ("TP", "DP")]
 
-iterations = [200, 100]
+iterations = [RAW_PHYSICAL_COUNTERS[key]["iterations"] for key in ("TP", "DP")]
 layer_multiplier = [1, 8]  # keep DP at 8 layers
 
 # Normalize using total physical traffic only
@@ -66,4 +68,3 @@ for i, g in enumerate(groups):
     print(g)
     print(f"  Rx total: {rx_mib[i]:.6f}")
     print(f"  Tx total: {tx_mib[i]:.6f}")
-      
